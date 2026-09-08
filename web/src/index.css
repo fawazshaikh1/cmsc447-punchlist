@@ -1,0 +1,273 @@
+/* Spike harness styling. Deliberately minimal — visual design is a Sprint 2
+   story, and effort spent here now is effort not spent on the coordinate
+   pipeline the sprint goal actually depends on. */
+
+:root {
+  color-scheme: light;
+  --border: #d8d8dc;
+  --muted: #6b6b73;
+  --pass: #0a7d28;
+  --fail: #c00;
+  font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #f5f5f7;
+  color: #111;
+}
+
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* --- toolbar ------------------------------------------------------------ */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.toolbar-spacer { flex: 1; }
+
+.toolbar button,
+.page-picker select {
+  font: inherit;
+  padding: 5px 11px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.toolbar button:hover:not(:disabled) { background: #f0f0f2; }
+.toolbar button:disabled { opacity: 0.45; cursor: default; }
+.scale-readout { min-width: 66px; font-variant-numeric: tabular-nums; }
+.page-picker { display: flex; align-items: center; gap: 6px; }
+
+/* --- sheet -------------------------------------------------------------- */
+
+.sheet-stage { padding: 16px; overflow: auto; flex: 1; }
+
+/* position:relative anchors the SVG overlay; inline-block shrinks this wrapper
+   to exactly the canvas size so the overlay's bounding rect and the canvas's
+   bounding rect are identical. Any mismatch here becomes coordinate drift,
+   which is precisely the bug SCRUM-19 exists to rule out. */
+.sheet-frame {
+  position: relative;
+  display: inline-block;
+  background: #fff;
+  box-shadow: 0 1px 8px rgb(0 0 0 / 18%);
+}
+
+/* --- inspector ---------------------------------------------------------- */
+
+.inspector {
+  padding: 14px 16px 24px;
+  background: #fff;
+  border-top: 1px solid var(--border);
+}
+
+.inspector-header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.inspector-header h2 { font-size: 14px; margin: 0; }
+
+.inspector-header button {
+  font: inherit;
+  padding: 4px 10px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.inspector-header button:disabled { opacity: 0.45; cursor: default; }
+
+.inspector table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.inspector th,
+.inspector td { border: 1px solid var(--border); padding: 4px 10px; text-align: right; }
+.inspector th { background: #f2f2f4; font-weight: 600; text-align: left; }
+.inspector td:first-child,
+.inspector td:nth-child(2) { text-align: left; }
+.inspector tr.selected { background: #fff6d6; }
+
+.mono { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+
+/* --- shared ------------------------------------------------------------- */
+
+.muted { color: var(--muted); }
+.pass { color: var(--pass); font-weight: 600; }
+.fail { color: var(--fail); font-weight: 600; }
+
+.error {
+  margin: 12px 16px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fdecea;
+  color: #8a1c13;
+}
+
+.empty-state { padding: 40px 16px; max-width: 62ch; }
+.empty-state h1 { font-size: 20px; }
+.empty-state ol { color: var(--muted); }
+
+/* --- tool palette (Sprint 2) -------------------------------------------- */
+
+.tool-palette {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 8px 16px;
+  background: #fafafb;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 45px;
+  z-index: 9;
+}
+
+.tool-group { display: flex; gap: 4px; }
+
+.tool {
+  font: inherit;
+  padding: 5px 12px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.tool:hover { background: #f0f0f2; }
+
+.tool.active {
+  background: #111;
+  border-color: #111;
+  color: #fff;
+}
+
+.swatch {
+  width: 26px;
+  height: 26px;
+  border: 2px solid #fff;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px #bbb;
+  cursor: pointer;
+  padding: 0;
+}
+
+.swatch.active { box-shadow: 0 0 0 2px #111; }
+
+.stroke-picker { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+
+.stroke-picker select {
+  font: inherit;
+  padding: 4px 8px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #fff;
+}
+
+/* --- export ------------------------------------------------------------- */
+
+.toolbar button.primary {
+  background: #111;
+  border-color: #111;
+  color: #fff;
+}
+
+.toolbar button.primary:hover:not(:disabled) { background: #333; }
+
+.notice {
+  margin: 12px 16px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #e9f6ec;
+  color: #145c2c;
+}
+
+/* --- workspace + properties panel --------------------------------------- */
+
+.workspace { display: flex; align-items: flex-start; flex: 1; min-height: 0; }
+.workspace .sheet-stage { flex: 1; min-width: 0; }
+
+.properties {
+  width: 260px;
+  flex: none;
+  padding: 14px 16px 18px;
+  background: #fff;
+  border-left: 1px solid var(--border);
+  align-self: stretch;
+}
+
+.properties-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.properties-header strong { text-transform: capitalize; }
+.properties-header .muted { font-size: 11px; }
+
+.properties-header .icon {
+  margin-left: auto;
+  font-size: 18px;
+  line-height: 1;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0 4px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.field textarea,
+.field select {
+  font: inherit;
+  font-size: 13px;
+  color: #111;
+  padding: 6px 8px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #fff;
+  resize: vertical;
+}
+
+.small { font-size: 11px; }
+
+button.danger {
+  font: inherit;
+  width: 100%;
+  padding: 7px 12px;
+  border: 1px solid #c9342a;
+  border-radius: 6px;
+  background: #fff;
+  color: #c00;
+  cursor: pointer;
+}
+
+button.danger:hover { background: #fdecea; }
+
+.tool:disabled { opacity: 0.4; cursor: default; }

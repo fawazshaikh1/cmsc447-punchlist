@@ -1,0 +1,217 @@
+import { useCallback, useMemo, useRef } from 'react';
+
+import { ViewportPoint } from '../../domain/geometry/ViewportPoint';
+import { ErrorBoundary } from './ErrorBoundary';
+import { SourceAnnotationLayer } from './SourceAnnotationLayer';
+import { MarkerRegistry } from './markers';
+
+/**
+ * A key that changes whenever an annotation's geometry does.
+ *
+ * Used to remount the per-marker ErrorBoundary, so a markup that failed to
+ * render in one state recovers the moment it leaves that state — rather than
+ * staying permanently broken for the rest of the session.
+ */
+function markerResetKey(annotation) {
+  try {
+    const { x, y } = annotation.getAnchor();
+    return `${annotation.id}:${x}:${y}`;
+  } catch {
+    // Even reading the anchor can throw on a malformed annotation.
+    return annotation.id;
+  }
+}
+
+/**
+ * Placeholder for a markup whose renderer threw.
+ *
+ * Shows a small dashed marker rather than nothing, because a silently missing
+ * markup is worse than a visibly broken one: the user would believe their work
+ * had been lost, and would redraw it on top of something that is still stored
+ * and will still appear in the export.
+ *
+ * Must itself be incapable of throwing — it is the fallback.
+ */
+function BrokenMarker({ annotation, project }) {
+  let position = null;
+  try {
+    position = project(annotation.getAnchor());
+  } catch {
+    position = null;
+  }
+  if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) return null;
+
+  return (
+    <g transform={`translate(${position.x}, ${position.y})`} pointerEvents="none">
+      <rect x={-9} y={-9} width={18} height={18} fill="none" stroke="#c00" strokeWidth={1.5} strokeDasharray="3" />
+      <title>This markup could not be drawn. It is still saved and will still export.</title>
+    </g>
+  );
+}
+
+/**
+ * Transparent SVG sheet stacked over the canvas, carrying every annotation.
+ *
+ * ===========================================================================
+ * WHY MARKUPS SURVIVE ZOOM — the central idea
+ * ===========================================================================
+ * The `viewBox` is the page size **in PDF points**, while the SVG's CSS size is
+ * the page size **in screen pixels at the current zoom**. The browser performs
+ * the document -> screen transform itself, natively, every frame.
+ *
+ * Marker coordinates are therefore **NOT RECALCULATED** on zoom. A marker
+ * written at PDF point (200, 642) stays at (200, 642) in this SVG at every zoom
+ * level. Verified: zooming 1.00x -> 2.25x left every marker's geometry
+ * attributes byte-identical while the rendered size scaled correctly.
+ *
+ * ---------------------------------------------------------------------------
+ * THE Y FLIP
+ * ---------------------------------------------------------------------------
+ * SVG's Y axis points down; PDF's points up. Rather than flipping by hand
+ * (`svgY = pageHeight - pdfY`), which breaks as soon as rotation is involved,
+ * we ask a SCALE-1 transformer. At scale 1, pdf.js's viewport space IS this
+ * SVG's coordinate space. That function is handed to every marker as `project`.
+ *
+ * ---------------------------------------------------------------------------
+ * HIT TESTING WITHOUT THE MARKERS KNOWING
+ * ---------------------------------------------------------------------------
+ * Each marker is wrapped in a `<g data-annotation-id>`, so a pointerdown can
+ * find what it landed on with `closest()`. Selection and drag-to-move therefore
+ * live entirely in this component, and none of the six marker components had to
+ * change to gain either — which is the same "add, don't modify" property the
+ * registries give the model.
+ */
+export function AnnotationLayer({
+  page,
+  scale,
+  rotation,
+  annotations,
+  sourceAnnotations,
+  showSource,
+  selectedId,
+  onSelect,
+  onGestureStart,
+  onGestureMove,
+  onGestureEnd,
+  onGestureCancel,
+}) {
+  // Scale 1 => output is in this SVG's own coordinate space.
+  const layout = useMemo(() => page.createTransformer(1, rotation), [page, rotation]);
+
+  // Current scale => used only for sizing, so the overlay matches the canvas.
+  const rendered = useMemo(
+    () => page.createTransformer(scale, rotation),
+    [page, scale, rotation],
+  );
+
+  // The viewBox MUST come from the scale-1 transformer, not from
+  // `page.getGeometry()`. PageGeometry knows only the page's intrinsic
+  // `/Rotate`, not the rotation the user applied, so deriving the viewBox from
+  // it leaves the box unswapped after a 90-degree turn while the CSS box swaps
+  // correctly — silently stretching the overlay and misplacing every marker.
+  const viewBox = layout.getCssSize();
+  const cssSize = rendered.getCssSize();
+
+  /** PdfPoint -> this SVG's coordinate space. Handed to every marker. */
+  const project = useCallback((pdfPoint) => layout.toViewportPoint(pdfPoint), [layout]);
+
+  // Set when a drag actually moved something, so the click that follows
+  // pointerup does not also toggle the selection. Cleared on the next capture.
+  const suppressClick = useRef(false);
+
+  const pointAt = useCallback(
+    (event) => ViewportPoint.fromPointerEvent(event, event.currentTarget),
+    [],
+  );
+
+  /** Which annotation is under the pointer, if any. */
+  const hitTest = useCallback((event) => {
+    const node = event.target instanceof Element
+      ? event.target.closest('[data-annotation-id]')
+      : null;
+    return node?.getAttribute('data-annotation-id') ?? null;
+  }, []);
+
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox={`0 0 ${viewBox.width} ${viewBox.height}`}
+      width={cssSize.width}
+      height={cssSize.height}
+      style={{
+        position: 'absolute',
+        inset: 0,
+        cursor: 'crosshair',
+        // Stops the browser treating a drag as a scroll or pinch on a tablet,
+        // which would pan the page instead of drawing on it.
+        touchAction: 'none',
+      }}
+      onPointerDown={(event) => {
+        // Capture so a drag that leaves the SVG still delivers move and up
+        // events here. Without it, dragging past the sheet edge strands the
+        // gesture forever with no pointerup to finish it.
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+        suppressClick.current = false;
+        onGestureStart(pointAt(event), hitTest(event));
+      }}
+      onPointerMove={(event) => onGestureMove(pointAt(event))}
+      onPointerUp={(event) => {
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        suppressClick.current = onGestureEnd() === true;
+      }}
+      onPointerCancel={onGestureCancel}
+      onClickCapture={(event) => {
+        // Runs BEFORE a marker's own onClick. After a real drag we swallow the
+        // click, or releasing the pointer over the moved marker would toggle
+        // its selection off — the annotation would visibly deselect itself the
+        // moment the user finished positioning it.
+        if (suppressClick.current) {
+          event.stopPropagation();
+          suppressClick.current = false;
+        }
+      }}
+    >
+      {/* Existing PDF comments render FIRST, so they sit beneath the user's own
+          markups. They are read-only and are never re-exported. */}
+      {showSource && (
+        <ErrorBoundary label="source-annotations" fallback={null}>
+          <SourceAnnotationLayer annotations={sourceAnnotations} project={project} />
+        </ErrorBoundary>
+      )}
+
+      {annotations.map((annotation, index) => {
+        const Marker = MarkerRegistry.resolve(annotation.getKind());
+
+        // Unknown kind: a newer build wrote a markup type this one cannot draw.
+        // Skip the marker, keep the sheet.
+        if (!Marker) return null;
+
+        // Projecting the anchor can itself throw on a malformed annotation, so
+        // it happens inside the boundary's scope, not before it.
+        return (
+          <g key={annotation.id} data-annotation-id={annotation.id}>
+            <ErrorBoundary
+              // Remounting on any geometry change clears a previous failure, so
+              // a markup that broke while being dragged through a bad state
+              // recovers as soon as it leaves it.
+              key={markerResetKey(annotation)}
+              label={`marker:${annotation.getKind()}`}
+              fallback={<BrokenMarker project={project} annotation={annotation} />}
+            >
+              <Marker
+                annotation={annotation}
+                project={project}
+                rotation={rotation}
+                x={project(annotation.getAnchor()).x}
+                y={project(annotation.getAnchor()).y}
+                ordinal={index + 1}
+                isSelected={annotation.id === selectedId}
+                onSelect={onSelect}
+              />
+            </ErrorBoundary>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
