@@ -1,0 +1,140 @@
+import { useCallback, useEffect, useState } from 'react';
+
+import { useSheetEditor } from '../hooks/useSheetEditor';
+import { useSourceAnnotations } from '../hooks/useSourceAnnotations';
+import { AnnotationLayer } from './AnnotationLayer';
+import { CoordinateInspector } from './CoordinateInspector';
+import { PropertiesPanel } from './PropertiesPanel';
+import { SheetCanvas } from './SheetCanvas';
+import { ToolPalette } from './ToolPalette';
+
+/**
+ * Composes the canvas, the markup overlay, the tool palette and the properties
+ * panel into one editing surface.
+ *
+ * Owns the WIRING only. It performs no coordinate maths, contains no branch on
+ * tool or annotation type, and does not know what undo is — those rules live in
+ * `AnnotationService`, the tools, and `EditorService` respectively.
+ */
+export function SheetViewer({ sheetId, page, scale, rotation }) {
+  const editor = useSheetEditor({ sheetId, page, scale, rotation });
+
+  // Comments that were already in the uploaded PDF. Read-only.
+  //
+  // DEFAULT OFF, deliberately. Shown by default it was actively confusing: open
+  // a file you exported earlier and every one of YOUR OWN markups comes back as
+  // an "existing comment", so the sheet fills with dashed boxes drawn around
+  // things you already drew. The information is genuinely useful when a file
+  // arrives already marked up by someone else — but that is the rarer case, and
+  // it should be something the user asks for rather than something they have to
+  // work out how to turn off.
+  const sourceAnnotations = useSourceAnnotations(page);
+  const [showSource, setShowSource] = useState(false);
+
+  const selectById = useCallback(
+    (annotation) => editor.select(annotation.id),
+    [editor],
+  );
+
+  // Keyboard shortcuts. Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z are what every user
+  // already has in their fingers; Delete removes the selection; Escape clears
+  // it. Bound at the document level so they work wherever focus happens to be
+  // on the sheet — except inside a text field, where they mean something else.
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      const target = event.target;
+      const typing =
+        target instanceof HTMLElement &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable);
+      if (typing) return;
+
+      const mod = event.ctrlKey || event.metaKey;
+
+      if (mod && event.key.toLowerCase() === 'z') {
+        event.preventDefault();
+        if (event.shiftKey) editor.redo();
+        else editor.undo();
+        return;
+      }
+      if (mod && event.key.toLowerCase() === 'y') {
+        event.preventDefault();
+        editor.redo();
+        return;
+      }
+      if ((event.key === 'Delete' || event.key === 'Backspace') && editor.selected) {
+        event.preventDefault();
+        editor.remove(editor.selected);
+        return;
+      }
+      if (event.key === 'Escape') editor.select(null);
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [editor]);
+
+  return (
+    <>
+      <ToolPalette
+        activeToolId={editor.toolId}
+        onSelectTool={editor.selectTool}
+        style={editor.style}
+        onChangeStyle={editor.setStyle}
+        canUndo={editor.canUndo}
+        canRedo={editor.canRedo}
+        undoLabel={editor.undoLabel}
+        redoLabel={editor.redoLabel}
+        onUndo={editor.undo}
+        onRedo={editor.redo}
+        sourceCount={sourceAnnotations.length}
+        showSource={showSource}
+        onToggleSource={() => setShowSource((on) => !on)}
+      />
+
+      {editor.error && <p className="error">{editor.error}</p>}
+
+      <div className="workspace">
+        <div className="sheet-stage">
+          {/* .sheet-frame is position:relative + inline-block, which anchors the
+              absolutely-positioned overlay and shrinks the wrapper to exactly
+              the canvas, so the overlay's bounding rect equals the canvas's. */}
+          <div className="sheet-frame">
+            <SheetCanvas page={page} scale={scale} rotation={rotation} />
+            <AnnotationLayer
+              page={page}
+              scale={scale}
+              rotation={rotation}
+              annotations={editor.visible}
+              sourceAnnotations={sourceAnnotations}
+              showSource={showSource}
+              selectedId={editor.selectedId}
+              onSelect={selectById}
+              onGestureStart={editor.begin}
+              onGestureMove={editor.extend}
+              onGestureEnd={editor.finish}
+              onGestureCancel={editor.cancel}
+            />
+          </div>
+        </div>
+
+        <PropertiesPanel
+          annotation={editor.selected}
+          onUpdate={editor.update}
+          onDelete={editor.remove}
+          onClose={() => editor.select(null)}
+        />
+      </div>
+
+      <CoordinateInspector
+        page={page}
+        scale={scale}
+        rotation={rotation}
+        annotations={editor.annotations}
+        selectedId={editor.selectedId}
+        onClear={editor.clearSheet}
+      />
+    </>
+  );
+}
