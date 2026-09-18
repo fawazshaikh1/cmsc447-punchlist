@@ -57,6 +57,24 @@ export class FlattenedSheetExporter extends SheetExporter {
    * @param {import('../../domain/ports/SheetExporter').ExportRequest} request
    * @returns {Promise<Uint8Array>}
    */
+    /**
+   * Yes — this is the exporter that makes markups permanent.
+   *
+   * Flattening burns each markup's appearance into the page's own content
+   * stream and then removes the annotation object. What the architect opens is
+   * a picture of the drawing as it stood at that moment: there is no annotation
+   * left to select, move or delete, in any viewer.
+   *
+   * Because the app's copy can no longer be reconciled with the file that was
+   * issued, those markups stop being editable here. SealedByExportPolicy
+   * enforces that, on the strength of this one line.
+   *
+   * @returns {boolean}
+   */
+  seals() {
+    return true;
+  }
+
   async exportAnnotated({ sourceBytes, pages, author }) {
     const pdfDoc = await PDFDocument.load(sourceBytes.slice(0), { updateMetadata: false });
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
