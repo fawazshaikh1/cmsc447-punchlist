@@ -10,8 +10,11 @@ import { useServices } from '../ServiceContainer';
  * knowing what a DOM is.
  */
 export function useExport() {
-  const { exports, exportsFlattened } = useServices();
+  const { exports, exportsFlattened, activeSeals, editor } = useServices();
   const [status, setStatus] = useState({ busy: false, message: null, error: null });
+
+  /** Whether the flattened option would seal, so the caller can warn first. */
+  const flattenedSeals = exportsFlattened.seals();
 
   const exportDocument = useCallback(
     async ({ sourceFile, pageCount, sheetIdFor, author, flatten = false }) => {
@@ -27,18 +30,43 @@ export function useExport() {
         const sourceBytes = await sourceFile.arrayBuffer();
 
         const service = flatten ? exportsFlattened : exports;
-        const { bytes, annotatedPages, annotationCount } = await service.exportDocument({
-          sourceBytes,
-          pageCount,
-          sheetIdFor,
-          author,
-          onProgress: (done, total) =>
-            setStatus({ busy: true, message: `Collecting markups ${done}/${total}…`, error: null }),
-        });
+        const { bytes, annotatedPages, annotationCount, sealed } =
+          await service.exportDocument({
+            sourceBytes,
+            pageCount,
+            sheetIdFor,
+            author,
+            documentName: sourceFile.name,
+            onProgress: (done, total) =>
+              setStatus({
+                busy: true,
+                message: `Collecting markups ${done}/${total}…`,
+                error: null,
+              }),
+          });
 
         if (annotationCount === 0) {
           setStatus({ busy: false, message: 'Nothing to export — no markups yet.', error: null });
           return;
+        }
+
+        // ---------------------------------------------------------------
+        // APPLY THE SEAL TO THE RUNNING SESSION
+        // ---------------------------------------------------------------
+        // It is already in storage — ExportService wrote the record. This makes
+        // it visible NOW, so the panel locks the moment the file is issued
+        // rather than on the next sheet change. Without it the user could keep
+        // editing markups that the service has already started refusing, and
+        // meet the refusal as an error instead of a disabled field.
+        if (sealed) {
+          activeSeals.add(Object.values(sealed.annotationIdsBySheet).flat());
+
+          // Undo is the other way back to a sealed markup, and the policy cannot
+          // see it: a command replays a stored write directly. Clearing the
+          // history closes that door. The cost is the user's undo stack, which
+          // is a fair trade at the moment they issue a document — and the
+          // alternative is an undo button that quietly breaks a promise.
+          editor.reset();
         }
 
         download(
@@ -50,7 +78,9 @@ export function useExport() {
         setStatus({
           busy: false,
           error: null,
-          message: `Exported ${annotationCount} markup(s) across ${annotatedPages} sheet(s).`,
+          message:
+            `Exported ${annotationCount} markup(s) across ${annotatedPages} sheet(s).` +
+            (sealed ? ' They are now issued and read-only.' : ''),
         });
       } catch (error) {
         setStatus({
@@ -60,10 +90,10 @@ export function useExport() {
         });
       }
     },
-    [exports, exportsFlattened],
+    [exports, exportsFlattened, activeSeals, editor],
   );
 
-  return { ...status, exportDocument };
+  return { ...status, exportDocument, flattenedSeals };
 }
 
 /**

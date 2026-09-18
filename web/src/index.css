@@ -271,3 +271,207 @@ button.danger {
 button.danger:hover { background: #fdecea; }
 
 .tool:disabled { opacity: 0.4; cursor: default; }
+
+/* ===========================================================================
+   ISSUED (SEALED) MARKUPS AND THE CONFIRMATION MODAL
+   ===========================================================================
+   A markup that has been issued in a flattened PDF is part of a document
+   somebody else is now holding, so it can no longer be changed here. These
+   rules are the visual half of that rule — the enforcement is in
+   EditorService, and nothing below is load-bearing for correctness.
+
+   Everything keys off `[data-sealed]`, which AnnotationLayer puts on the
+   wrapper it already draws around every markup. That is why none of the six
+   marker components needed touching, and why a seventh will get this styling
+   for free.
+   ------------------------------------------------------------------------ */
+
+/* Faded, but still clearly legible. An issued markup is the record of what was
+   agreed — hiding it would be worse than not showing it at all. */
+[data-sealed] {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+/* Still selectable, so clicking one opens the panel that explains why it is
+   locked. Refusing the click would leave the user with no explanation at all. */
+[data-sealed]:hover { opacity: 0.85; }
+
+.properties-locked {
+  /* A quiet amber rail down the side. Enough to register before reading, not
+     so much that a read-only panel looks like an error. */
+  border-left: 3px solid #d08700;
+}
+
+.properties-locked .field textarea,
+.properties-locked .field select {
+  background: #f6f6f4;
+  color: #555;
+  cursor: not-allowed;
+}
+
+.notice-locked {
+  margin: 0 0 4px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fdf6e3;
+  border: 1px solid #e8d8a8;
+  color: #6b5200;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* --- the confirmation modal --------------------------------------------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(17, 17, 17, 0.45);
+}
+
+.modal {
+  width: min(480px, 100%);
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 20px 22px 18px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modal h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.modal-body {
+  font-size: 13px;
+  line-height: 1.55;
+  color: #333;
+}
+
+.modal-body p { margin: 0 0 10px; }
+.modal-body p:last-child { margin-bottom: 0; }
+
+/* The red top rule is reserved for the one action that cannot be undone. Using
+   it anywhere else would spend the signal. */
+.modal-danger { border-top: 3px solid #c9342a; }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.modal-actions button {
+  font: inherit;
+  font-size: 13px;
+  padding: 7px 14px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #fff;
+  cursor: pointer;
+}
+
+/* Width:100% from `button.danger` is for the panel's full-width Delete; inside
+   the modal these sit in a row, so it is overridden here rather than by
+   splitting the rule and touching the existing one. */
+.modal-actions button.danger,
+.modal-actions button.primary { width: auto; }
+
+.modal-actions button:hover { background: #f2f2f2; }
+.modal-actions button.danger:hover { background: #fdecea; }
+
+/* ===========================================================================
+   UNFINISHED MARKUPS
+   ===========================================================================
+   A pin with no description reaches the architect as a bare number on a
+   drawing. New pins cannot be in this state — the tool collects the
+   description and EditorService refuses a blank one — so what these rules
+   surface is work placed before that was required.
+
+   Like the seal, everything keys off an attribute AnnotationLayer puts on the
+   wrapper it already draws. No marker component knows the concept exists.
+   ------------------------------------------------------------------------ */
+
+/* An amber ring, drawn outside the marker so it reads as an annotation ON the
+   markup rather than a change to it. `paint-order` keeps the marker's own
+   stroke on top where the two overlap. */
+[data-incomplete] > * {
+  filter: drop-shadow(0 0 0 #d08700) drop-shadow(0 0 3px #d08700);
+}
+
+.properties-incomplete {
+  border-left: 3px solid #d08700;
+}
+
+.field-invalid textarea,
+.field-invalid input {
+  border-color: #d08700;
+  background: #fffdf6;
+}
+
+.field-error {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #8a6400;
+}
+
+.notice-incomplete {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: #fff8e6;
+  border: 1px solid #e8d8a8;
+  color: #6b5200;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* Who last touched this item (D14). Quiet — it is context, not content. */
+.attribution {
+  padding-top: 8px;
+  border-top: 1px solid #eee;
+}
+
+/* --- the prompt modal's field -------------------------------------------- */
+
+.modal .field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #555;
+}
+
+.modal .field textarea,
+.modal .field input {
+  font: inherit;
+  font-size: 13px;
+  color: #111;
+  padding: 8px 10px;
+  border: 1px solid #bbb;
+  border-radius: 6px;
+  background: #fff;
+  resize: vertical;
+}
+
+.modal .field textarea:focus,
+.modal .field input:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: -1px;
+  border-color: #2563eb;
+}
+
+.modal-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
