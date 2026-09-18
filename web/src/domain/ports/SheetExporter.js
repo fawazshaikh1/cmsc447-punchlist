@@ -50,4 +50,31 @@ export class SheetExporter {
   exportAnnotated(request) {
     return abstractMethod('SheetExporter', 'exportAnnotated', request);
   }
+
+  /**
+   * Whether the file this exporter produces makes its markups permanent.
+   *
+   * =========================================================================
+   * WHY THE EXPORTER ANSWERS THIS, AND NOT A FLAG PASSED IN BY THE CALLER
+   * =========================================================================
+   * Sealing is a consequence of HOW the markups reach the page, and only the
+   * exporter knows that. Flattening paints them into the page content, so the
+   * recipient holds a drawing that cannot be un-drawn — a handover. A native
+   * export writes live annotation objects that any reader can move or delete —
+   * a working copy.
+   *
+   * Asking the object that did the work keeps that knowledge where it belongs.
+   * If the caller decided instead, every caller would need to know which
+   * exporters flatten, and a future third exporter would mean finding and
+   * editing all of them.
+   *
+   * NOT in REQUIRED, deliberately: the default is the safe one. A new exporter
+   * seals nothing until its author opts in by overriding this, so forgetting to
+   * think about it cannot accidentally freeze a user's markups.
+   *
+   * @returns {boolean}
+   */
+  seals() {
+    return false;
+  }
 }

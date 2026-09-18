@@ -37,6 +37,17 @@ export class TextTool extends AnnotationTool {
     return true;
   }
 
+  /** A callout is a short label on a drawing, so one line is right. */
+  getTextPrompt() {
+    return {
+      title: 'Add a callout',
+      label: 'Callout text',
+      placeholder: 'e.g. SEE DETAIL 3/A-401',
+      confirmLabel: 'Add callout',
+      multiline: false,
+    };
+  }
+
   /** @param {import('./AnnotationTool').DraftRequest} request @returns {TextMarkup} */
   createDraft({ id, sheetId, point, style, text }) {
     return new TextMarkup(

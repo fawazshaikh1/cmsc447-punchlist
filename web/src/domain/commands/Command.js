@@ -42,6 +42,31 @@ export class Command {
    * its tooltip, so a user knows what they are about to reverse.
    * @returns {string}
    */
+  /**
+   * The annotations this command touches.
+   *
+   * =========================================================================
+   * WHY THE COMMAND HAS TO ANSWER THIS
+   * =========================================================================
+   * Undo and redo write to the repository directly, replaying a stored change.
+   * That is what makes them fast and exact — but it also means they walk past
+   * `EditorService`'s recording step, so the change log would keep saying "this
+   * device edited it" about an edit that had just been undone.
+   *
+   * Only the command knows which annotations it moved. Rather than have
+   * EditorService inspect command types — a conditional that every new command
+   * would force an edit to — the command says so itself.
+   *
+   * NOT in REQUIRED, so the default is the safe one: a command that does not
+   * override this is simply not audited, which is correct for a command that
+   * does not touch annotations at all. Forgetting cannot corrupt the log.
+   *
+   * @returns {import('../annotations/Annotation').Annotation[]}
+   */
+  affects() {
+    return [];
+  }
+
   describe() {
     return abstractMethod('Command', 'describe');
   }

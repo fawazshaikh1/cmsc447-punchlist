@@ -25,6 +25,10 @@ export class AddAnnotationCommand extends Command {
     return `Add ${this.annotation.getKind()}`;
   }
 
+  affects() {
+    return [this.annotation];
+  }
+
   async execute() {
     await this.repository.save(this.annotation);
   }
@@ -47,6 +51,10 @@ export class DeleteAnnotationCommand extends Command {
 
   describe() {
     return `Delete ${this.annotation.getKind()}`;
+  }
+
+  affects() {
+    return [this.annotation];
   }
 
   async execute() {
@@ -79,6 +87,14 @@ export class UpdateAnnotationCommand extends Command {
     return `${this.label} ${this.next.getKind()}`;
   }
 
+  /**
+   * `next` rather than `previous`: both carry the same id and sheet, which is
+   * all the log needs, and `next` is what exists after a redo.
+   */
+  affects() {
+    return [this.next];
+  }
+
   async execute() {
     await this.repository.save(this.next);
   }
@@ -108,6 +124,11 @@ export class CompositeCommand extends Command {
 
   describe() {
     return this.label;
+  }
+
+  /** Flattened, so a nested composite still reports everything it moved. */
+  affects() {
+    return this.commands.flatMap((command) => command.affects());
   }
 
   async execute() {
