@@ -1,0 +1,13 @@
+# Compiled binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary and output
+*.test
+*.out
+
+# Go workspace file
+go.work
