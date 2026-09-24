@@ -4,9 +4,9 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-09-18
+**Last updated:** 2026-09-23 (later)
 **Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go · PostgreSQL · AWS (S3, RDS)
-**Codebase:** 115 source files, ~11,323 lines
+**Codebase:** 127 source files, ~13,759 lines
 
 ---
 
@@ -31,6 +31,11 @@ easy to write.
 | **Unfinished items surfaced** | **Done** | Marked on sheet + panel; export confirmation names the count |
 | **Who changed what, and when** | **Done** | Change log per annotation; shown in the panel |
 | **Sign-in seam for Sprint 2** | **Ready, not wired** | `SessionIdentityProvider` written; verify script signs a user in by swapping one argument |
+| **Photos — camera and upload** | **Done** | Placed, stored, survived reload, embedded in the export as a real JPEG |
+| **Photo anchoring** | **Done** | Stored point identical through rotate + zoom; round-trip exact |
+| **Field-tool interface** | **Done** | Dark chrome, icon rail, 44px targets, responsive to 900px |
+| **Resize photos, text and shapes** | **Done** | `scaledBy` capability; exactly reversible; 4 domain checks |
+| **Text fields never lose an edit** | **Fixed** | Commit on blur OR unmount, carrying the right annotation |
 | **Edit pin description + status** | **Done** | Persisted and undoable |
 | **Delete a markup** | **Done** | Undoable; panel closes; selection cleared |
 | Keyboard: Ctrl/Cmd+Z, Shift+Z, Delete, Esc | **Done** | Bound in SheetViewer, ignored while typing |
@@ -642,3 +647,297 @@ Cancel create nothing; a described pin saves and logs as "this device added it";
 sheets keep separate annotations and separate logs; undo removes the pin and
 records the undo; a flattened export completes, writes `exportedBy: "this
 device"`, seals its markups and disables Undo.
+
+### 2026-09-23 — Photographs, and an interface that looks like a product
+
+Two pieces: the seventh markup type, and a redesign ahead of the demo.
+
+**Photos cost four files and four registration lines.** `PhotoMarkup`,
+`PhotoMarker`, `PhotoTool`, `photoWriter` — exactly what ARCHITECTURE.md has
+claimed since Sprint 1. No existing annotation type, service, repository,
+overlay or panel was edited. The tool rail and the properties panel picked it up
+on their own, because both read registries rather than lists.
+
+**What was new was a port, not an edit.** Image bytes cannot go in the
+annotation: `localStorage` is ~5MB for the whole origin and one iPad photo is
+3–5MB, so the first photo of the first walk would exhaust it mid-save. So
+`MediaStore` is its own port on IndexedDB, and the annotation carries a
+`MediaRef` — key, MIME type, dimensions. That is already the Sprint 2 shape,
+where the key becomes an S3 key (NFR-5).
+
+**Every image is re-encoded to JPEG**, which solves three things in one pass:
+size (1600px longest edge, NFR-4), format (PDF embeds only JPEG and PNG, and an
+iPhone hands you HEIC), and EXIF orientation. The third would only have shown up
+at a demo — a desktop file picker never produces a rotation flag, so every
+portrait phone photo would have exported on its side.
+
+**One writer had to become async.** `pdfDoc.embedJpg` reads bytes.
+`PdfWriterRegistry.write` now awaits whatever a writer returns; `await` on a
+non-promise resolves immediately, so the other six were untouched. Both
+exporters' write loops changed from `forEach` to an indexed `for`, because
+`forEach` cannot await — it would have scheduled the writes and saved the
+document before any photo finished, producing an export with every photo
+missing.
+
+**The coordinate discipline caught a real bug during testing.** The first
+`PhotoMarker` passed `{ x, y }` object literals to `project`, and
+`assertInstanceOf` threw immediately with the coordinate-space hint. That is
+precisely the class of fault the nominal typing exists for — screen and document
+coordinates silently mixed. Fixed by giving `PhotoMarkup` a `getCorners()` that
+returns real `PdfPoint`s, so the rule is enforced in the model rather than
+remembered at each call site.
+
+**Interface.** Rebuilt as a field tool rather than a test harness: dark chrome
+so the drawing is the brightest thing on screen, a vertical icon rail on the
+left where a tablet-holding thumb reaches, 44px minimum targets, one accent
+(the markup red) so the status colours keep meaning what they mean, and IBM Plex
+Sans + JetBrains Mono to match the proposal deck. Icons are drawn in `Icon.jsx`
+rather than installed — a generic set has no glyph for a revision cloud that a
+superintendent would recognise. Responsive to 900px, where the panel becomes a
+slide-over.
+
+**Verified in the browser, end to end.** PNG upload transcoded to JPEG (33KB →
+13.6KB), stored in IndexedDB, rendered on the sheet, survived a page reload, and
+exported — confirmed by re-opening the exported file in the app, where pdf.js
+reports one real annotation, and by `/DCTDecode` plus a JPEG SOI marker in the
+bytes. Stored point identical through a 90° rotation and a zoom
+(220.00, 387.17 both times) while the screen position moved.
+
+`npm run verify` 28/28. Build clean. Lint 22 warnings, all in the three known
+categories and none new.
+
+**Not done:** deleting a photo markup does not yet remove its blob from the
+media store, so an orphan is left behind. Harmless at this scale and a
+deliberate deferral — the clean fix is a `MediaStore` sweep at document close,
+which belongs with the Sprint 2 S3 work rather than bolted on now.
+
+### 2026-09-23 (later) — a silent data-loss bug, a cloud that was a wave, resizing
+
+**The caption bug was real, and worse than reported.** Fields committed on
+`blur`, chosen so an edit is one undo step rather than one per keystroke. What
+that missed is that `blur` does not fire when a focused element is removed from
+the DOM. So typing a caption and then closing the panel, selecting another
+markup, or changing sheets discarded it silently.
+
+It was never only captions — the pin **description** and the callout **text**
+had the same hole, on the field a user is most likely to be in the middle of.
+Reproduced exactly: type, click the panel's close button, edit gone.
+
+`useCommitOnBlur` closes it. The subtle part is not the unmount case but the
+SELECTION case: the panel does not unmount when you pick a different markup, it
+re-renders, so a naive flush would apply the text you typed for photo A onto
+photo B. The keystroke therefore stores `{ commit, value }` together, capturing
+the commit closure from the render the user was actually typing in. Every flush
+path — blur, selection change, unmount — replays that same pair and cannot write
+to the wrong annotation.
+
+**The cloud was drawing a wave.** Each bump was an exact semicircle laid end to
+end, which meets the edge at a right angle and flows smoothly into the next —
+a decorative border, not a revision cloud. Two things were wrong and both had to
+change:
+
+* **The sweep.** A cloud bump is a MAJOR arc, about 240 degrees, so the outline
+  curves back toward the edge and meets the next bump at a cusp. `scallopArcs`
+  now derives the radius and centre offset from the sweep, and `sweep = PI`
+  collapses to exactly the old semicircle — so it is a generalisation, not a
+  rewrite.
+* **The size.** The radius was a flat 9pt whatever the cloud's size, so a large
+  one got about seventeen bumps an edge and read as a coil. It is now derived
+  from the perimeter for a roughly constant bump COUNT, which is the drafting
+  convention and is what makes a small cloud and a large one read as the same
+  symbol.
+
+Then the screen renderer had to change too. `A rx ry rot large-arc sweep x y`
+does not say which circle to use: two endpoints and a radius admit two circles,
+and the flags pick one of four arcs. That was unambiguous enough to reason about
+while every bump was a semicircle; with a 240-degree bump the plausible flag
+pair selects the major arc on the MIRRORED circle and every bump renders as a
+loop crossing its own base. `CloudMarker` now draws the same Béziers the
+exporter does, via `arcToBeziers` — no flags, no ambiguity, and the
+shared-geometry promise becomes literal rather than approximate.
+
+`arcToBeziers` also had to stop splitting every arc into two segments. That was
+right for a semicircle; 120 degrees per cubic is well outside where the
+approximation holds, and the exported bumps would have come out lopsided while
+looking correct on screen. The split is now derived from the sweep.
+
+**Resizing is a capability, not a feature.** `scaledBy(factor)` on the four
+types that have a size — photo, text, and the two-point shapes plus ink — and
+`EditorService.resize` routes it through the same single write path, so a resize
+is one undo step, is refused on issued work by the same policy, and is recorded
+with the same attribution. The panel offers the control to anything that
+implements the method, exactly as it offers a description box to anything with
+`withLabel`. A pin has no size, implements nothing, and no control appears.
+
+Everything scales about its ANCHOR rather than its centre: a photo grows from
+the corner that was tapped and an arrow from its tail, because both mean
+something at the point the user put them. Growing about the centre would walk
+the markup off the defect it describes. The step is 1.2 and its reciprocal, so a
+press each way returns to exactly where it started — verified.
+
+**Every SCRUM-XX reference is gone**, from the coordinate inspector's on-screen
+text and from the source comments.
+
+**Verified.** `npm run verify` 32/32 (10 sealing, 22 rules, attribution and
+resize). In the browser: typing a caption then closing the panel now SAVES; the
+cloud draws as puffy bumps at both large and small sizes; photo 160→230pt, text
+12→21pt, cloud 455×179→316×124→455×179 exactly; and an export containing a
+photo, a callout and a cloud re-opens with all three readable by pdf.js and the
+JPEG embedded. Build clean, lint 22 warnings — the same three pre-existing
+categories, none new.
+
+### 2026-09-23 (evening) — the cloud, properly this time
+
+The user reported the exported cloud as a row of crossed loops and the caption
+as missing. Both turned out to be my own regressions from earlier the same day,
+and one of them I introduced while "fixing" the other.
+
+**The caption was never a rendering fault.** It was the commit-on-blur data loss
+fixed earlier in the day: the caption was being discarded before it ever reached
+the export, so the writer correctly drew no caption band for an empty string.
+With that fixed, the band renders.
+
+**The cloud was two faults stacked.** Raising the bump sweep from 180 to 240
+degrees was right in principle, but I also swapped `from` and `to` on the
+strength of a hand calculation that used the wrong outward normal. Every arc
+then ran BACKWARDS along its own chord, so bump i ended where bump i-1 started.
+
+That hid itself well: the SVG renderer just continues the path, and the absolute
+Bezier control points still described bump-shaped curves, so the screen looked
+plausible. The PDF writer emits an explicit lineto between arcs, so there the
+same geometry came out as teardrops with straight lines slashing the corners —
+visible only after exporting and opening the file. Exactly the shape of bug the
+shared-geometry module was supposed to prevent, reintroduced by hand.
+
+**Stopped guessing.** Built a scratch page rendering nine sweep-and-count
+combinations side by side and looked at them. The first version of that page was
+itself wrong — built in screen coordinates while the real code works in PDF
+space, which flips the handedness and made all nine look equally broken. Once it
+matched the real convention, the answer was obvious: the original traversal
+order was correct, and **200 degrees** gives round full lobes with clean cusps.
+240 is past the point where each bump's base pinches inward and the outline
+reads as a flower.
+
+**Two new checks assert the geometry directly**, where neither renderer can hide
+it: consecutive bumps must share an endpoint to within a thousandth of a point
+and the outline must close, and every bump's apex must sit further from the
+shape's centre than its own chord. Either one fails immediately on the swap.
+
+**Also:** the caption now scales with the photo's width rather than sitting at a
+fixed 9pt — photos are resizable now, so a constant size was never going to
+hold — and a photo's `/Contents` carries just the caption instead of three lines
+including the pixel dimensions.
+
+**On the yellow box.** That is the PDF viewer's own annotation popup, drawn by
+Chrome for any annotation carrying `/Contents`. It is not ours to style. It also
+cannot appear in the ISSUED file: flattening removes the annotation objects
+entirely, verified at 0 live annotations on re-open. The file showing a popup
+was a Working copy.
+
+Verified: issued export now matches the editable view exactly — both clouds,
+the caption, no popup. `npm run verify` 34/34. Build clean, lint unchanged.
+
+---
+
+## Issuing a drawing that already has markups on it
+
+**Reported:** export a working copy, reopen it, press Issue — "Nothing to
+export — no markups yet", about a sheet visibly covered in marks.
+
+A sheet id is `filename#pageIndex`. Exporting renames the file, so reopening
+`drawing-marked-up.pdf` looks up a sheet nobody has ever drawn on: our count
+came back 0. The flattener underneath was perfectly capable of burning in the
+markups the *file* was carrying — it was never asked, because the gate in
+`useExport` refused on our count alone.
+
+Two populations of markup, equal on a first export and divergent on a re-issue:
+`annotationCount` is what we hold and can seal; `flattenedCount` is what
+actually reached the page, including whatever the file arrived with. The
+exporter now reports the second, and the gate refuses only when both are zero.
+
+`SheetExporter` **widened** rather than changed: an exporter may return bytes,
+as `PdfLibSheetExporter` still does untouched, or `{ bytes, flattenedCount,
+flattenedPages }`. `ExportService` normalises both, so the new information is
+opt-in and the native path could not be disturbed by it.
+
+The success message now reports what was burned in rather than what we
+contributed — "exported 0 markups" about a file full of them was simply false.
+
+## Seeing what a pin is for on an issued PDF
+
+**Reported:** "in the flat, i cannot see what the pin is for, i can't see the
+description and stuff, please make it like fieldwire".
+
+A pin's description lived only in the annotation's `/Contents`, which Acrobat
+shows on hover. Flattening removes the annotation — that is the whole point of
+flattening — so the issued file showed a red circle with a number in it and
+nothing anywhere to say what the number meant.
+
+**First attempt: a schedule instead of a label.** The reasoning was that
+sentences on the architect's linework bury the drawing, and that the canvas
+draws a bare numbered circle so a label in the export only would break the
+"export matches the editable view" promise.
+
+**Overruled, correctly.** "i need the pin description to show, or else how would
+we know if that thing is done or verified after completion" — somebody walking
+the site with a printed sheet has to read the item AT the pin. A schedule on
+another page does not answer "is this one done?" while standing in the room.
+
+Both now exist: the label answers "what is this mark", the schedule answers
+"what is outstanding across the set".
+
+**A second bug, found on the way.** Pins were numbered by their position in the
+sheet's annotation list, which holds every markup. A pin drawn after two boxes
+exported as "Punch item 3" — and deleting a box silently renumbered it, on a
+document somebody had already printed and walked the site with. `assignOrdinals`
+now counts each kind separately, across the whole set, and the same map feeds
+both the pin writer and the schedule, so the two cannot disagree.
+
+New: `domain/punchlist/` (`PunchListEntry`, `PunchListRegistry`,
+`assignOrdinals`) and `infrastructure/export/PunchListPageWriter`. A markup type
+joins the schedule by registering a builder — `Pin.js` was not touched, and the
+whole folder can be deleted without breaking it. The schedule is on by default
+for a flattened export and off with `new FlattenedSheetExporter({ punchList: null })`.
+
+**On type scaling.** Scaling font sizes with the sheet like everything else
+turned 10pt body into 42pt on ARCH D — half an inch tall — and cost a page.
+Space scales with the paper; type is sized for a reader at arm's length, and the
+reader does not step back because the sheet got bigger. Type now scales as the
+square root, capped: ARCH D lands around 21pt.
+
+Verified: `npm run verify` 54/54 (10 sealing + 24 rules/attribution + 8 re-issue
++ 12 punch list). The two new suites drive the real flattener against real PDFs
+and read the text back out of the produced file rather than asserting against
+the layout code. Build clean, lint unchanged at 22 pre-existing warnings.
+Confirmed visually: pin "1" on the plan, row 1 of the schedule, same item.
+
+## The description, on the drawing
+
+The label is drawn beside each pin: the description wrapped to at most three
+lines, and the status as a tag — `OPEN`, `READY FOR REVIEW`, `CLOSED` — so
+"is this done?" is answerable from the paper alone.
+
+**It had to go on both sides.** An export-only label would have broken the
+promise that the issued PDF matches what you see while marking up. So the
+layout lives once in `domain/annotations/geometry/pinLabel.js` and is drawn
+twice: `PinLabel.jsx` in SVG, `pinLabelOps.js` in PDF operators. Neither decides
+where anything goes — both ask. That is the same arrangement the cloud ended up
+with after it drifted, for the same reason.
+
+The layout returns PDF space, where **Y is up**, and the SVG side negates it. A
+sign error there is invisible on screen and wrong in the export, so
+`verify-pin-label.mjs` asserts the geometry directly: first line above last,
+status tag last, box straddling the pin, every baseline inside the box.
+Confirmed by flipping the sign on purpose — two checks fail, and pass again when
+restored.
+
+**A bug this introduced, caught by the existing suite.** `pinLabelOps` measures
+with pdf-lib's `widthOfTextAtSize`, which THROWS on anything outside WinAnsi —
+so an emoji pasted into a punch item no longer produced a bad label, it failed
+the entire export. Sanitizing on the PDF side alone would have been worse: the
+canvas would measure a different string and wrap at a different word. The fold
+happens once in the shared layout, before anything is measured, so both
+renderers work from identical text. Accented Latin survives; WinAnsi covers it.
+
+Verified visually, canvas against export: same wrap point, same box, same leader,
+same tag. `npm run verify` 64/64. Build clean, lint unchanged at 22.

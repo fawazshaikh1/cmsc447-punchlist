@@ -92,8 +92,8 @@ Marker coordinates are therefore **never recalculated**. Verified: zooming
 
 ## The registries
 
-An annotation type has to do exactly four things, and each is answered by a
-registry rather than by a conditional in a consumer:
+Each question a consumer might ask about an annotation type is answered by a
+registry rather than by a conditional in that consumer:
 
 | Registry | Answers | Tier | On unknown kind |
 |---|---|---|---|
@@ -101,10 +101,18 @@ registry rather than by a conditional in a consumer:
 | `MarkerRegistry` | how to draw it on screen | presentation | skips — a missing marker is cosmetic |
 | `ToolRegistry` | how to create it from a gesture | domain | n/a — tools are looked up by id |
 | `PdfWriterRegistry` | how to write it into an exported PDF | infrastructure | **throws** — silently dropping a markup from an export is data loss |
+| `AnnotationRuleRegistry` | when it is complete enough to issue | domain | no rules — nothing to enforce |
+| `PunchListRegistry` | how it reads on the issued schedule | domain | skips — most markups are not action items |
 
-Four sounds like a lot until you notice the alternative: a `switch` in each of
-those four consumers, so every new type risks breaking every existing one and
+Six sounds like a lot until you notice the alternative: a `switch` in each of
+those six consumers, so every new type risks breaking every existing one and
 guarantees merge conflicts on a team working in parallel.
+
+Note how the "unknown kind" column differs, and that the differences are not
+accidental. Failing to draw a marker is a glitch the user can see and report.
+Failing to *export* one is silent data loss discovered by a client, so that one
+throws. Being absent from the schedule is simply what a box or a cloud should
+do — they are emphasis, not work somebody has to carry out.
 
 The same instinct is why *issued* markups are marked with a `data-sealed`
 attribute on the wrapper `AnnotationLayer` already draws, and *unfinished* ones
@@ -195,6 +203,71 @@ Two details that are easy to miss and are load-bearing:
 
 Run `npm run verify:sealing` to check all of this against the real domain
 classes, with no UI and no test framework.
+
+## Photographs — the seventh markup type
+
+Photos were the first real test of the "add, don't edit" claim, because they
+needed something no previous type did: somewhere to put bytes.
+
+The type itself cost exactly what ARCHITECTURE.md has always promised — four
+files and four registration lines (`PhotoMarkup`, `PhotoMarker`, `PhotoTool`,
+`photoWriter`). No existing annotation type, service, repository, overlay or
+panel was edited. The tool rail, the properties panel and the export all picked
+it up on their own.
+
+What was genuinely new was a **new port**, not a change to an existing one.
+
+### Why bytes live in their own store
+
+An annotation DTO goes to `localStorage`: about 5MB for the whole origin, shared
+across every sheet of every drawing. One iPad photo is 3–5MB before downscaling.
+Putting image data in the annotation would exhaust that on the first photo of
+the first walk, and the failure would arrive as a quota error mid-save, taking
+the user's text with it.
+
+So `MediaStore` is a separate port backed by IndexedDB, which stores Blobs
+natively with no base64 penalty and a quota measured against free disk. The
+annotation carries only a `MediaRef` — a key, a MIME type and the dimensions.
+
+That is also the Sprint 2 shape: NFR-5 says files live in S3 and never pass
+through the API server, so the Postgres row will hold an S3 key and the browser
+will fetch with a pre-signed URL. `MediaRef` does not change. The swap is
+`- new IndexedDbMediaStore()` / `+ new S3MediaStore('/api')`.
+
+### Every image is re-encoded, even a small one
+
+`CanvasImageProcessor` draws the input to a canvas and re-encodes to JPEG. One
+pass, three problems:
+
+* **Size** — 1600px longest edge (NFR-4), roughly a 90% reduction.
+* **Format** — PDF embeds only JPEG and PNG. An iPhone hands you HEIC, which
+  could not otherwise reach the export at all.
+* **Orientation** — a phone held sideways writes an EXIF flag rather than
+  rotating pixels. `createImageBitmap(..., { imageOrientation: 'from-image' })`
+  bakes it in. PDF has no concept of EXIF, so without this every portrait shot
+  exports on its side — a bug a desktop file picker never reproduces.
+
+### One async writer
+
+`photoWriter` embeds an image, and `pdfDoc.embedJpg` reads bytes, so it cannot
+be synchronous. `PdfWriterRegistry.write` now awaits whatever a writer returns;
+`await` on a non-promise resolves immediately, so the other six writers were not
+touched. Both exporters were already inside an async method.
+
+The image becomes a form XObject inside the annotation's appearance stream
+rather than being drawn onto the page, because the constraint that has held
+since Sprint 1 still holds: the architect's page comes out byte-identical, with
+only annotation objects appended. A missing photo draws a crossed placeholder
+rather than failing the export — media and annotations live in separate stores
+and can diverge, and losing a hundred good markups to one absent image would be
+the wrong trade.
+
+### Capture is two peers, not a fallback
+
+The camera is the point — a superintendent should not leave the app. But it
+needs a permission the user can refuse, hardware a desktop may lack, and a
+secure context a plain `http://` LAN address does not provide. So upload is a
+peer, not a fallback, and either path hands back one Blob.
 
 ## Completeness rules
 
@@ -351,6 +424,7 @@ web/src/
                                RoleEditPolicy (written, NOT wired)
     rules/                     AnnotationRule (CONTRACT), RuleViolation,
                                AnnotationRuleRegistry, RequiredDescriptionRule
+    media/                     MediaRef — a pointer to bytes, not the bytes
     identity/                  Actor, StaticIdentityProvider,
                                CounterIdGenerator
     audit/                     ChangeRecord — who did what, NullChangeLog
@@ -358,7 +432,7 @@ web/src/
     ports/                     AnnotationRepository, DocumentSource,
                                IdGenerator, SheetExporter,
                                ExportHistoryRepository, IdentityProvider,
-                               ChangeLogRepository — all CONTRACTS
+                               ChangeLogRepository, MediaStore — all CONTRACTS
     services/                  AnnotationService (the tap->PdfPoint rule),
                                EditorService (the ONLY writer),
                                ExportService
@@ -370,15 +444,20 @@ web/src/
                                export-history and change-log repositories
     identity/                  CryptoIdGenerator,
                                SessionIdentityProvider (written, NOT wired)
+    media/                     IndexedDbMediaStore, CanvasImageProcessor
     identity/                  CryptoIdGenerator
 
   presentation/                TIER 1 — React
     ServiceContainer.jsx       COMPOSITION ROOT — the only wiring file
     hooks/                     document / view state / annotations / drawing / export
     components/                canvas, overlay, toolbar, palette, inspector
-      markers/                 6 SVG components + MarkerRegistry
+      markers/                 7 SVG components + MarkerRegistry
+    media/                     MediaUrlCache + useMediaUrl — object URLs made
+                               once and revoked once
       ConfirmDialog.jsx        promise-based modal (useConfirmation)
       PromptDialog.jsx         promise-based text input (useTextPrompt)
+      PhotoCaptureDialog.jsx   camera + upload (usePhotoCapture)
+      Icon.jsx                 the icon set, drawn not installed
       SealingNotice.jsx        the wording used to explain permanence
       useBackdropDismiss.js    a backdrop click only counts if it started there
       useAutoFocus.js          focus that survives the gesture that opened it
