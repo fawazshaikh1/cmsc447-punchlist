@@ -108,6 +108,39 @@ export class TwoPointMarkup extends Annotation {
    *
    * @param {number} dxPts @param {number} dyPts @returns {TwoPointMarkup}
    */
+  /**
+   * A copy scaled about its START point.
+   *
+   * =========================================================================
+   * ONE METHOD, THREE MARKUP TYPES
+   * =========================================================================
+   * Box, revision cloud and arrow are all two-point shapes, so all three gain
+   * resizing from this one implementation — and a fourth two-point type would
+   * too, without touching anything.
+   *
+   * Scaled about `start` rather than the centre because `start` is where the
+   * user pressed. An arrow in particular MEANS something at its tail: growing
+   * it about the centre would walk the head off whatever it is pointing at.
+   *
+   * `this.constructor` for the same reason `movedBy` uses it — a subclass gets
+   * back its own type rather than a TwoPointMarkup.
+   *
+   * @param {number} factor
+   */
+  scaledBy(factor) {
+    return new this.constructor(
+      this.id,
+      this.sheetId,
+      this.start,
+      new PdfPoint(
+        this.start.x + (this.end.x - this.start.x) * factor,
+        this.start.y + (this.end.y - this.start.y) * factor,
+      ),
+      this.style,
+      this.createdAt,
+    );
+  }
+
   movedBy(dxPts, dyPts) {
     return new this.constructor(
       this.id,

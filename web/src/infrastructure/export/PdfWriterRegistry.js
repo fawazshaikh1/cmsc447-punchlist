@@ -57,12 +57,27 @@ export class PdfWriterRegistry {
   }
 
   /**
+   * Writers may be synchronous or asynchronous, and this awaits either.
+   *
+   * =========================================================================
+   * WHY ASYNC WAS ADDED, AND WHY IT COST NOTHING
+   * =========================================================================
+   * Six of the seven writers draw with content-stream operators they compose
+   * from numbers — entirely synchronous. The seventh embeds a photograph, and
+   * `pdfDoc.embedJpg` reads bytes, so it cannot be.
+   *
+   * `await` on a value that is not a promise resolves immediately, so the six
+   * existing writers were not touched and pay nothing for the seventh's needs.
+   * Both exporters were already inside an async method, so the change there is
+   * one keyword each.
+   *
    * @param {import('../../domain/annotations/Annotation').Annotation} annotation
    * @param {WriteContext} context
+   * @returns {Promise<void>}
    * @throws {Error} if no writer is registered for the annotation's kind —
    *         silently dropping a markup from an export is data loss.
    */
-  static write(annotation, context) {
+  static async write(annotation, context) {
     const writer = this.#writers.get(annotation.getKind());
     if (!writer) {
       throw new Error(
@@ -71,7 +86,7 @@ export class PdfWriterRegistry {
           `must be exportable — add a writer in infrastructure/export/writers/.`,
       );
     }
-    writer(annotation, context);
+    await writer(annotation, context);
   }
 
   /** @returns {string[]} */

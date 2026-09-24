@@ -11,6 +11,9 @@ import { AnnotationService } from '../domain/services/AnnotationService';
 import { EditorService } from '../domain/services/EditorService';
 import { ExportService } from '../domain/services/ExportService';
 import { PdfJsDocumentSource } from '../infrastructure/pdf/PdfJsDocumentSource';
+import { IndexedDbMediaStore } from '../infrastructure/media/IndexedDbMediaStore';
+import { CanvasImageProcessor } from '../infrastructure/media/CanvasImageProcessor';
+import { MediaUrlCache } from './media/MediaUrlCache';
 import { PdfLibSheetExporter, FlattenedSheetExporter } from '../infrastructure/export';
 import { LocalStorageAnnotationRepository } from '../infrastructure/persistence/LocalStorageAnnotationRepository';
 import { LocalStorageChangeLogRepository } from '../infrastructure/persistence/LocalStorageChangeLogRepository';
@@ -64,6 +67,9 @@ const ServiceContext = createContext(null);
  *        Override for tests. Defaults to local storage so seals survive reload.
  * @param {import('../domain/ports/ChangeLogRepository').ChangeLogRepository} [props.changeLog]
  *        Override for tests. Defaults to local storage.
+ * @param {import('../domain/ports/MediaStore').MediaStore} [props.mediaStore]
+ *        Override for tests. Defaults to IndexedDB, which unlike
+ *        localStorage can hold a photograph without a size penalty.
  * @param {import('../domain/ports/IdentityProvider').IdentityProvider} [props.identity]
  *        Override for tests — pass a `StaticIdentityProvider(actor)` to work as
  *        a named user before sign-in exists. Defaults to anonymous.
@@ -76,6 +82,7 @@ export function ServiceContainer({
   exportHistory,
   changeLog,
   identity,
+  mediaStore,
 }) {
   // useMemo, not a plain expression: these are stateful singletons. pdf.js holds
   // a Web Worker, the repository holds a cache and ActiveSeals holds
@@ -99,6 +106,17 @@ export function ServiceContainer({
     // line and real names start appearing in logs that have been running since
     // the beginning.
     const who = identity ?? new StaticIdentityProvider();
+
+    // WHERE PHOTOGRAPHS LIVE. A separate store from annotations because the two
+    // have nothing in common operationally — see MediaStore. Sprint 2 swaps
+    // this one line for `new S3MediaStore('/api')`.
+    const media = mediaStore ?? new IndexedDbMediaStore();
+    const imageProcessor = new CanvasImageProcessor();
+
+    // Object URLs, created once per photo and revoked together. Held here
+    // rather than per component so the same photo on the sheet and in the
+    // panel shares one URL rather than pinning the Blob twice.
+    const mediaUrls = new MediaUrlCache(media);
 
     // Which markups on the open sheet have already been issued. Loaded from the
     // export history when a sheet opens, and added to when an export completes.
@@ -143,6 +161,18 @@ export function ServiceContainer({
       exportHistory: exports_,
       changeLog: log,
       activeSeals,
+      media,
+      mediaUrls,
+      /**
+       * Downscales an image and stores it, returning what an annotation
+       * carries. Exposed as one call so no caller can store the ORIGINAL by
+       * doing the two steps separately — which would defeat every reason
+       * the downscale exists (NFR-4).
+       *
+       * @param {Blob} blob
+       * @returns {Promise<import('../domain/media/MediaRef').MediaRef>}
+       */
+      storePhoto: (blob) => imageProcessor.storeAsRef(blob, media),
       // Export runs in the browser today. When a 153-page set proves too large
       // to hold in memory, this becomes an HttpSheetExporter posting to a Go
       // job queue — a new adapter and this one line, because ExportService
@@ -153,20 +183,20 @@ export function ServiceContainer({
       // reaching it is permanent — each exporter answers `seals()` for itself.
       exports: new ExportService(
         annotations,
-        exporter ?? new PdfLibSheetExporter(),
+        exporter ?? new PdfLibSheetExporter({ media }),
         exports_,
         ids,
         { identity: who },
       ),
       exportsFlattened: new ExportService(
         annotations,
-        new FlattenedSheetExporter(),
+        new FlattenedSheetExporter({ media }),
         exports_,
         ids,
         { identity: who },
       ),
     };
-  }, [repository, documentSource, exporter, exportHistory, changeLog, identity]);
+  }, [repository, documentSource, exporter, exportHistory, changeLog, identity, mediaStore]);
 
   return <ServiceContext.Provider value={services}>{children}</ServiceContext.Provider>;
 }

@@ -118,6 +118,39 @@ export class AnnotationTool {
   }
 
   /**
+   * Does this tool need an image before it can create anything?
+   *
+   * The same shape as `requiresText`, and deliberately a SEPARATE flag rather
+   * than a generic "needs input" with a type field. A tool that wants both a
+   * photo and a caption should be able to say so, and two booleans express that
+   * without anyone inventing a combination rule.
+   *
+   * The presentation layer captures, downscales and stores the image, then
+   * passes the resulting MediaRef in `request.photo`.
+   *
+   * @returns {boolean}
+   */
+  requiresPhoto() {
+    return false;
+  }
+
+  /**
+   * How to ask for that image.
+   *
+   * Same reasoning as `getTextPrompt`: the tool owns the wording, so the
+   * capture dialog never has to branch on which tool opened it.
+   *
+   * @returns {{ title: string, hint: string, confirmLabel: string }}
+   */
+  getPhotoPrompt() {
+    return {
+      title: 'Add a photo',
+      hint: 'Take one now, or choose a file.',
+      confirmLabel: 'Add photo',
+    };
+  }
+
+  /**
    * True for a tool that manipulates EXISTING annotations rather than creating
    * new ones — currently only SelectTool.
    *

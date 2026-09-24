@@ -1,7 +1,9 @@
 import { PDFDocument, PDFName, PDFDict, PDFArray, StandardFonts } from 'pdf-lib';
 
 import { SheetExporter } from '../../domain/ports/SheetExporter';
+import { PunchListRegistry, assignOrdinals } from '../../domain/punchlist';
 import { PdfWriterRegistry } from './PdfWriterRegistry';
+import { PunchListPageWriter } from './PunchListPageWriter';
 import { ensureDefaultFontResource } from './pdfPrimitives';
 import './writers';
 
@@ -54,10 +56,23 @@ import './writers';
  */
 export class FlattenedSheetExporter extends SheetExporter {
   /**
-   * @param {import('../../domain/ports/SheetExporter').ExportRequest} request
-   * @returns {Promise<Uint8Array>}
+   * @param {object} [options]
+   * @param {import('../../domain/ports/MediaStore').MediaStore} [options.media]
+   *        Where photo bytes are read from during export. Optional so an
+   *        exporter with no photos to embed needs no wiring — a drawing marked
+   *        up with boxes and clouds exports identically without it.
+   * @param {PunchListPageWriter|null} [options.punchList]
+   *        Appends the schedule of punch items. On by default, because
+   *        flattening is precisely what destroys the descriptions — see
+   *        PunchListPageWriter. Pass `null` for a plan-only PDF.
    */
-    /**
+  constructor({ media = null, punchList = new PunchListPageWriter() } = {}) {
+    super();
+    this.media = media;
+    this.punchList = punchList;
+  }
+
+  /**
    * Yes — this is the exporter that makes markups permanent.
    *
    * Flattening burns each markup's appearance into the page's own content
@@ -75,20 +90,56 @@ export class FlattenedSheetExporter extends SheetExporter {
     return true;
   }
 
-  async exportAnnotated({ sourceBytes, pages, author }) {
+  /**
+   * @param {import('../../domain/ports/SheetExporter').ExportRequest} request
+   * @returns {Promise<{ bytes: Uint8Array, flattenedCount: number, flattenedPages: number }>}
+   */
+  async exportAnnotated({ sourceBytes, pages, author, documentName }) {
     const pdfDoc = await PDFDocument.load(sourceBytes.slice(0), { updateMetadata: false });
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     ensureDefaultFontResource(pdfDoc, font);
 
     const pageCount = pdfDoc.getPageCount();
 
+    // Numbered ONCE, up front, and shared by the writer that draws the pin and
+    // the schedule that describes it. Two independent counts would be two
+    // chances to disagree, and a schedule row pointing at the wrong mark on the
+    // drawing is worse than no schedule at all.
+    const ordinals = assignOrdinals(pages);
+
     // PASS 1 — add our markups as annotations, using the ordinary writers.
     for (const { pageIndex, annotations } of pages) {
       if (pageIndex < 0 || pageIndex >= pageCount) continue;
       const page = pdfDoc.getPage(pageIndex);
-      annotations.forEach((annotation, index) => {
-        PdfWriterRegistry.write(annotation, { pdfDoc, page, author, font, index });
-      });
+      // A sequential `for` rather than `forEach`, because one writer is async:
+      // the photo writer reads bytes and embeds an image. `forEach` cannot await,
+      // so the annotations would be scheduled and the document saved before any
+      // of them had finished — an export with every photo missing.
+      //
+      // Sequential rather than Promise.all on purpose: pdf-lib's document is
+      // mutable shared state, and appending to /Annots from several concurrent
+      // writers is not something it promises to survive. Photos are few per
+      // sheet, so the lost parallelism is not worth the risk.
+      for (let index = 0; index < annotations.length; index++) {
+        const annotation = annotations[index];
+
+        await PdfWriterRegistry.write(annotation, {
+          pdfDoc,
+          page,
+          author,
+          font,
+          index,
+          // The number this markup carries among others of ITS OWN kind, across
+          // the whole document. A pin numbered by its position in the sheet's
+          // annotation list was numbered by how many boxes happened to be drawn
+          // first — see assignOrdinals.
+          ordinal: ordinals.get(annotation),
+          // How a writer reaches image bytes. A function rather than the
+          // store itself, so a writer cannot delete or overwrite media
+          // while exporting — it can only read.
+          loadMedia: (key) => this.media?.get(key) ?? Promise.resolve(null),
+        });
+      }
     }
 
     // PASS 2 — burn EVERY annotation on EVERY page into the page content.
@@ -115,6 +166,15 @@ export class FlattenedSheetExporter extends SheetExporter {
     // sticky note, whose icon the viewer draws itself. There is no artwork to
     // burn in, so it stays. Our own pins are /Stamp precisely so that they DO
     // carry artwork and can be flattened.
+
+    // How many annotations were actually burned into the page — OURS plus any
+    // that were already in the file. The caller needs this to tell the truth
+    // about an export, and the two counts are not interchangeable: re-opening
+    // a previously exported drawing gives a file with markups in it and none of
+    // them ours. See the note on the return.
+    let flattenedTotal = 0;
+    let flattenedPages = 0;
+
     for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
       const page = pdfDoc.getPage(pageIndex);
       const refs = existingAnnotationRefs(page);
@@ -148,10 +208,38 @@ export class FlattenedSheetExporter extends SheetExporter {
         // Removed only after being painted — leaving them would draw every
         // markup twice, once as content and once as an annotation.
         removeAnnotations(page, flattened);
+        flattenedTotal += flattened.length;
+        flattenedPages += 1;
       }
     }
 
-    return pdfDoc.save();
+    // PASS 3 — append the punch list schedule.
+    //
+    // AFTER pass 2, deliberately. The schedule pages carry no annotations, so
+    // flattening would skip them anyway, but appending last also keeps the
+    // numbering above from depending on pages that did not exist when it ran.
+    await this.punchList?.append(pdfDoc, PunchListRegistry.collect(pages, ordinals), {
+      documentName,
+      issuedBy: author,
+    });
+
+    // ======================================================================
+    // WHY THIS RETURNS AN OBJECT WHERE THE CONTRACT SAYS Uint8Array
+    // ======================================================================
+    // `SheetExporter` accepts either, and `ExportService` normalises. Widening
+    // it that way rather than changing the contract outright means
+    // PdfLibSheetExporter still returns bare bytes and was not touched.
+    //
+    // The count matters because of a real fault: export a working copy, reopen
+    // it, and press Issue. The markups are all THERE — but they are the file's
+    // annotations now, not ours, so our own count is zero and the app reported
+    // "no markups yet" while refusing to flatten a drawing covered in them.
+    // This is the number that makes the difference visible to the caller.
+    return {
+      bytes: await pdfDoc.save(),
+      flattenedCount: flattenedTotal,
+      flattenedPages,
+    };
   }
 }
 

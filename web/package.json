@@ -7,10 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "verify": "npm run verify:sealing && npm run verify:rules",
+    "verify": "npm run verify:sealing && npm run verify:rules && npm run verify:reissue && npm run verify:punchlist && npm run verify:pin-label",
     "verify:sealing": "node --import ./scripts/register-resolver.mjs scripts/verify-sealing.mjs",
     "verify:rules": "node --import ./scripts/register-resolver.mjs scripts/verify-rules-and-attribution.mjs",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:reissue": "node --import ./scripts/register-resolver.mjs scripts/verify-reissue.mjs",
+    "verify:punchlist": "node --import ./scripts/register-resolver.mjs scripts/verify-punchlist.mjs",
+    "verify:pin-label": "node --import ./scripts/register-resolver.mjs scripts/verify-pin-label.mjs"
   },
   "dependencies": {
     "pdf-lib": "^1.17.1",

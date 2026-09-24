@@ -46,6 +46,9 @@ const fallbackPrompt = async ({ title }) => {
  * asks `EditorService` and passes the answers on.
  *
  * @param {object} options
+ * @param {(request: object) => Promise<import('../../domain/media/MediaRef').MediaRef|null>} [options.capturePhoto]
+ *        How to obtain an image a tool has declared it needs. Same seam as
+ *        `promptForText`: the hook never opens a camera, it asks.
  * @param {(request: object) => Promise<string|null>} [options.promptForText]
  *        How to collect text a tool has declared it needs. Injected rather than
  *        called directly so the hook does not own a dialog, and so swapping the
@@ -58,6 +61,7 @@ export function useSheetEditor({
   scale,
   rotation,
   promptForText = fallbackPrompt,
+  capturePhoto = async () => null,
 }) {
   const { annotations: reader, editor, exportHistory, changeLog, activeSeals } =
     useServices();
@@ -294,6 +298,16 @@ export function useSheetEditor({
         }
 
         const extras = {};
+
+        // Photo first, because it is the step most likely to be abandoned —
+        // a denied camera permission or a cancelled file picker. Asking for
+        // a caption before knowing there IS a photo would waste the typing.
+        if (tool.requiresPhoto()) {
+          const photo = await capturePhoto(tool.getPhotoPrompt());
+          if (photo === null) return;
+          extras.photo = photo;
+        }
+
         if (tool.requiresText()) {
           // The TOOL describes what it needs; the presentation layer decides
           // how to ask. That is why a pin says "What needs fixing?" and a
@@ -322,7 +336,18 @@ export function useSheetEditor({
         setError(cause instanceof Error ? cause.message : String(cause));
       }
     },
-    [tool, items, reader, editor, context, run, promptForText, setDraftBoth, setMovingBoth],
+    [
+      tool,
+      items,
+      reader,
+      editor,
+      context,
+      run,
+      promptForText,
+      capturePhoto,
+      setDraftBoth,
+      setMovingBoth,
+    ],
   );
 
   /** Pointer move. */
@@ -395,6 +420,24 @@ export function useSheetEditor({
   );
 
   /**
+   * Scales a markup about its anchor.
+   *
+   * Routed through `run` like every other mutation, so a resize is one undo
+   * step, is refused on issued work by the same policy, and is recorded with
+   * the same attribution. Nothing about resizing needed a new path.
+   */
+  const resize = useCallback(
+    (annotation, factor) => run(() => editor.resize(annotation, factor)),
+    [editor, run],
+  );
+
+  /** Whether this markup has a size the interface should offer to change. */
+  const canResize = useCallback(
+    (annotation) => editor.canResize(annotation),
+    [editor],
+  );
+
+  /**
    * Clears the sheet, reporting anything the seal kept.
    *
    * The service returns what it actually did rather than assuming, so the
@@ -448,6 +491,8 @@ export function useSheetEditor({
 
     update,
     remove,
+    resize,
+    canResize,
     clearSheet,
 
     // Permission and completeness, as data rather than as rules this layer
