@@ -15,6 +15,7 @@ import { PdfLibSheetExporter, FlattenedSheetExporter } from '../infrastructure/e
 import { LocalStorageAnnotationRepository } from '../infrastructure/persistence/LocalStorageAnnotationRepository';
 import { LocalStorageChangeLogRepository } from '../infrastructure/persistence/LocalStorageChangeLogRepository';
 import { LocalStorageExportHistoryRepository } from '../infrastructure/persistence/LocalStorageExportHistoryRepository';
+import { HttpAuthRepository } from '../infrastructure/auth/HttpAuthRepository';
 import { CryptoIdGenerator } from '../infrastructure/identity/CryptoIdGenerator';
 
 /**
@@ -26,7 +27,8 @@ import { CryptoIdGenerator } from '../infrastructure/identity/CryptoIdGenerator'
  * base classes in `domain/`, so this is the single place to edit when an
  * implementation changes.
  *
- *   Moving persistence to the Go API in Sprint 2 is exactly this diff:
+ *   After project selection and server sheet-ID mapping are wired, the
+ *   persistence binding changes here (see docs/AUTHENTICATION.md):
  *       - new LocalStorageAnnotationRepository()
  *       + new HttpAnnotationRepository('/api')
  *
@@ -125,6 +127,7 @@ export function ServiceContainer({
 
     return {
       annotations,
+      auth: new HttpAuthRepository('/api'),
       // Every write goes through this one object, so every change is checked,
       // validated, reversible and recorded. All four follow from there being
       // exactly one write path. See EditorService.

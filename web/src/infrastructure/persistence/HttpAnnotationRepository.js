@@ -4,19 +4,10 @@ import { AnnotationRepository } from '../../domain/ports/AnnotationRepository';
 /**
  * Repository backed by the Go API. TIER 3.
  *
- * ===========================================================================
- * NOT WIRED IN SPRINT 1 — the API does not exist yet.
- * ===========================================================================
- * It is written now, and fully implemented rather than stubbed, because it is
- * the concrete proof that the contract abstraction pays for itself. Switching
- * the entire application from local storage to the server is one line in
- * ServiceContainer.jsx:
- *
- *     - new LocalStorageAnnotationRepository()
- *     + new HttpAnnotationRepository('/api')
- *
- * No component, no hook, no domain class changes. That is the "add, don't
- * modify" property stated as a diff rather than as a promise.
+ * The authenticated Go API now exists; this adapter remains opt-in until the
+ * project picker and server sheet-ID mapping are connected. See
+ * docs/AUTHENTICATION.md. Do not switch the local editor's filename#page IDs
+ * directly to shared storage.
  *
  * ---------------------------------------------------------------------------
  * ENDPOINT CONTRACT expected of the Go service
@@ -78,7 +69,11 @@ export class HttpAnnotationRepository extends AnnotationRepository {
    *        contract and keeping outbox replay safe to retry.
    */
   async #request(path, init, tolerate = []) {
-    const response = await this.fetchFn(`${this.baseUrl}${path}`, init);
+    const response = await this.fetchFn(`${this.baseUrl}${path}`, {
+      ...init,
+      credentials: 'same-origin',
+      headers: { ...init?.headers, 'X-Punchlist-Request': '1' },
+    });
     if (!response.ok && !tolerate.includes(response.status)) {
       throw new Error(
         `${init?.method ?? 'GET'} ${path} failed: ${response.status} ${response.statusText}`,

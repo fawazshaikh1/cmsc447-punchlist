@@ -311,7 +311,11 @@ Testing only in Acrobat is how that ships broken.
 
 ## How to move persistence to the Go API (Sprint 2)
 
-One line in `ServiceContainer.jsx`:
+The authenticated backend now requires project membership and server-issued
+sheet IDs. Connect login, project selection, and PDF page-to-sheet mapping first;
+see [Authentication implementation](AUTHENTICATION.md). The current filename-based
+IDs and browser-local editor are not authenticated shared project storage.
+After that integration, change the binding in `ServiceContainer.jsx`:
 
 ```diff
 - const repo = repository ?? new LocalStorageAnnotationRepository();

@@ -10,3 +10,9 @@ Team
 Name 1 — role
 Name 2 — role
 Name 3 — role
+
+## Authentication and tests
+
+See [Authentication implementation and handoff](docs/AUTHENTICATION.md) for setup,
+API examples, project roles, test commands, and current integration limits.
+The backend remains an in-memory prototype; its data resets on restart.
