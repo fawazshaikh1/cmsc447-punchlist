@@ -4,6 +4,7 @@ import { PinTool } from './PinTool';
 import { RectangleTool, CloudTool, ArrowTool } from './ShapeTools';
 import { InkTool } from './InkTool';
 import { TextTool } from './TextTool';
+import { PhotoTool } from './PhotoTool';
 
 /**
  * Registers the drawing tools.
@@ -35,6 +36,7 @@ ToolRegistry.register(new CloudTool());
 ToolRegistry.register(new ArrowTool());
 ToolRegistry.register(new InkTool());
 ToolRegistry.register(new TextTool());
+ToolRegistry.register(new PhotoTool());
 
 export { ToolRegistry } from './ToolRegistry';
 export { AnnotationTool } from './AnnotationTool';
@@ -44,3 +46,4 @@ export { PinTool } from './PinTool';
 export { RectangleTool, CloudTool, ArrowTool } from './ShapeTools';
 export { InkTool } from './InkTool';
 export { TextTool } from './TextTool';
+export { PhotoTool } from './PhotoTool';

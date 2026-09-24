@@ -1,5 +1,6 @@
 import { PIN_KIND, PinStatus } from '../../../domain/annotations';
 import { MarkerRegistry } from './MarkerRegistry';
+import { PinLabel } from './PinLabel';
 
 /** Trade-standard colour language: red open, amber pending, green closed. */
 const STATUS_COLOUR = {
@@ -9,6 +10,18 @@ const STATUS_COLOUR = {
 };
 
 const RADIUS = 11;
+
+/**
+ * The status wording on the label. Must match STATUS_TAG in pinWriter — the
+ * canvas and the export are meant to show the same words, and this is the one
+ * string the shared layout module cannot supply, because how a status READS is
+ * a presentation choice while the layout is a geometric one.
+ */
+const STATUS_TAG = {
+  [PinStatus.OPEN]: 'OPEN',
+  [PinStatus.READY_FOR_REVIEW]: 'READY FOR REVIEW',
+  [PinStatus.CLOSED]: 'CLOSED',
+};
 
 /**
  * Draws a punch-item pin.
@@ -48,6 +61,17 @@ function PinMarker({ annotation: pin, x, y, ordinal, isSelected, onSelect }) {
         onSelect(pin);
       }}
     >
+      {/*
+        Drawn BEFORE the circle so the pin sits on top of the leader line
+        rather than having it run across the disc — the same order pinWriter
+        uses, for the same reason.
+      */}
+      <PinLabel
+        description={pin.label}
+        status={STATUS_TAG[pin.status] ?? pin.status}
+        colour={STATUS_COLOUR[pin.status]}
+      />
+
       <circle
         r={RADIUS}
         fill={STATUS_COLOUR[pin.status]}

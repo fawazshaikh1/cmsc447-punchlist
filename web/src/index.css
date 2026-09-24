@@ -1,477 +1,1200 @@
-/* Spike harness styling. Deliberately minimal — visual design is a Sprint 2
-   story, and effort spent here now is effort not spent on the coordinate
-   pipeline the sprint goal actually depends on. */
+/* ===========================================================================
+   PUNCH LIST — design system
+   ===========================================================================
+   A field tool, not a website. Three rules drive everything below.
+
+   1. THE DRAWING IS THE BRIGHTEST THING ON SCREEN. All chrome is dark, so the
+      sheet reads as the document and the interface recedes around it. This is
+      how every professional document tool is built, and it matters more here
+      than usual: an architectural drawing is fine black linework on white, and
+      pale chrome competes with it directly.
+
+   2. COLOUR IN THE CHROME IS RESERVED. Red, amber, green and blue all MEAN
+      something on a punch walk — issue, review, accepted, note. So the
+      interface uses exactly one accent and otherwise stays neutral. A blue
+      "Save" button would read as a note-coloured markup.
+
+   3. TOUCH FIRST. The target device is an iPad held in one hand on a site.
+      Every control is at least 44px, the tool rail is down the left where a
+      thumb reaches, and nothing depends on hover.
+
+   Type is IBM Plex Sans with JetBrains Mono for anything numeric — the same
+   pairing as the project's proposal deck, so the product and the presentation
+   look like one thing.
+   ------------------------------------------------------------------------ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root {
-  color-scheme: light;
-  --border: #d8d8dc;
-  --muted: #6b6b73;
-  --pass: #0a7d28;
-  --fail: #c00;
-  font: 14px/1.5 system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Chrome. A single ramp, so raised surfaces are obvious without borders. */
+  --ink-900: #0f1923;
+  --ink-800: #16222f;
+  --ink-700: #1e2e40;
+  --ink-650: #243449;
+  --ink-600: #2c3f56;
+  --ink-500: #3d5169;
+  --ink-400: #5a6472;
+  --ink-300: #8a97a6;
+  --ink-200: #a8b4c0;
+  --ink-100: #cdd6df;
+
+  /* Paper. The sheet and the panels that describe it. */
+  --paper: #f7f6f2;
+  --paper-2: #eae7df;
+  --paper-3: #ddd9cf;
+  --white: #ffffff;
+
+  /* The one accent. Matches the markup red, so the interface and the marks
+     a user makes are visibly the same product. */
+  --accent: #c8442b;
+  --accent-hi: #e05238;
+  --accent-dim: #8f301f;
+
+  /* Status. These are DATA colours — never used for chrome. */
+  --status-open: #e8342a;
+  --status-review: #d08700;
+  --status-closed: #1f9d4d;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+
+  /* One z scale, so nothing is ever guessed. */
+  --z-stage: 1;
+  --z-chrome: 10;
+  --z-panel: 20;
+  --z-modal: 50;
+
+  --tap: 44px;
+  --dur: 160ms;
+
+  color-scheme: dark;
 }
 
-* { box-sizing: border-box; }
+/* Honour the system setting rather than animating regardless. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
 
 body {
   margin: 0;
-  background: #f5f5f7;
-  color: #111;
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  /* 16px minimum — anything smaller triggers zoom-on-focus in iOS Safari. */
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--paper);
+  background: var(--ink-900);
+  -webkit-font-smoothing: antialiased;
+  /* The drawing handles its own gestures; the page itself never bounces. */
+  overscroll-behavior: none;
 }
 
-.app { display: flex; flex-direction: column; min-height: 100vh; }
-
-/* --- toolbar ------------------------------------------------------------ */
-
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 16px;
-  background: #fff;
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+/* One visible focus treatment everywhere, including on dark chrome. */
+:focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
-.toolbar-spacer { flex: 1; }
-
-.toolbar button,
-.page-picker select {
+button {
   font: inherit;
-  padding: 5px 11px;
-  border: 1px solid #bbb;
-  border-radius: 6px;
-  background: #fff;
   cursor: pointer;
 }
 
-.toolbar button:hover:not(:disabled) { background: #f0f0f2; }
-.toolbar button:disabled { opacity: 0.45; cursor: default; }
-.scale-readout { min-width: 66px; font-variant-numeric: tabular-nums; }
-.page-picker { display: flex; align-items: center; gap: 6px; }
+button:disabled {
+  cursor: default;
+}
 
-/* --- sheet -------------------------------------------------------------- */
+.mono {
+  font-family: 'JetBrains Mono', ui-monospace, 'Courier New', monospace;
+  font-variant-numeric: tabular-nums;
+}
 
-.sheet-stage { padding: 16px; overflow: auto; flex: 1; }
+.muted {
+  color: var(--ink-300);
+}
 
-/* position:relative anchors the SVG overlay; inline-block shrinks this wrapper
-   to exactly the canvas size so the overlay's bounding rect and the canvas's
-   bounding rect are identical. Any mismatch here becomes coordinate drift,
-   which is precisely the bug SCRUM-19 exists to rule out. */
-.sheet-frame {
+.small {
+  font-size: 13px;
+}
+
+/* ===========================================================================
+   SHELL — header, tool rail, stage, panel
+   ------------------------------------------------------------------------ */
+
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  height: 100%;
+  min-height: 0;
+}
+
+.app-body {
+  display: grid;
+  /* Rail is fixed; the panel is fixed; the sheet takes what is left. minmax(0)
+     is what stops a wide drawing from pushing the panel off screen. */
+  grid-template-columns: 76px minmax(0, 1fr) 360px;
+  min-height: 0;
+  background: var(--ink-900);
+}
+
+.app-body.no-panel {
+  grid-template-columns: 76px minmax(0, 1fr);
+}
+
+/* ===========================================================================
+   TOP BAR
+   ------------------------------------------------------------------------ */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--ink-800);
+  border-bottom: 1px solid var(--ink-650);
   position: relative;
-  display: inline-block;
-  background: #fff;
-  box-shadow: 0 1px 8px rgb(0 0 0 / 18%);
+  z-index: var(--z-chrome);
 }
 
-/* --- inspector ---------------------------------------------------------- */
-
-.inspector {
-  padding: 14px 16px 24px;
-  background: #fff;
-  border-top: 1px solid var(--border);
-}
-
-.inspector-header {
+.brand {
   display: flex;
-  align-items: baseline;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
+  align-items: center;
+  gap: 10px;
+  padding-right: 14px;
+  margin-right: 4px;
+  border-right: 1px solid var(--ink-650);
 }
 
-.inspector-header h2 { font-size: 14px; margin: 0; }
+.brand-mark {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--white);
+  flex: none;
+}
 
-.inspector-header button {
+.brand-name {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.doc-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--ink-700);
+  color: var(--ink-100);
+  font-size: 14px;
+}
+
+.doc-chip strong {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 26ch;
+}
+
+.topbar-spacer {
+  flex: 1;
+}
+
+.topbar-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius);
+  background: var(--ink-700);
+}
+
+/* The workhorse control: square, icon-only, 44px of tap area. */
+.icon-button {
+  display: grid;
+  place-items: center;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-100);
+  transition: background var(--dur) ease, color var(--dur) ease;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--ink-600);
+  color: var(--white);
+}
+
+.icon-button:disabled {
+  color: var(--ink-500);
+}
+
+.icon-button.is-active {
+  background: var(--accent);
+  color: var(--white);
+}
+
+.readout {
+  min-width: 72px;
+  padding: 0 10px;
+  font-size: 13px;
+  color: var(--ink-100);
+  text-align: center;
+}
+
+.sheet-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius);
+  background: var(--ink-700);
+}
+
+.sheet-nav select {
   font: inherit;
-  padding: 4px 10px;
-  border: 1px solid #bbb;
-  border-radius: 6px;
-  background: #fff;
+  font-size: 14px;
+  min-height: 38px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--white);
   cursor: pointer;
 }
 
-.inspector-header button:disabled { opacity: 0.45; cursor: default; }
-
-.inspector table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
-.inspector th,
-.inspector td { border: 1px solid var(--border); padding: 4px 10px; text-align: right; }
-.inspector th { background: #f2f2f4; font-weight: 600; text-align: left; }
-.inspector td:first-child,
-.inspector td:nth-child(2) { text-align: left; }
-.inspector tr.selected { background: #fff6d6; }
-
-.mono { font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
-
-/* --- shared ------------------------------------------------------------- */
-
-.muted { color: var(--muted); }
-.pass { color: var(--pass); font-weight: 600; }
-.fail { color: var(--fail); font-weight: 600; }
-
-.error {
-  margin: 12px 16px;
-  padding: 10px 12px;
-  border-radius: 6px;
-  background: #fdecea;
-  color: #8a1c13;
+.sheet-nav select option {
+  background: var(--ink-700);
+  color: var(--white);
 }
 
-.empty-state { padding: 40px 16px; max-width: 62ch; }
-.empty-state h1 { font-size: 20px; }
-.empty-state ol { color: var(--muted); }
-
-/* --- tool palette (Sprint 2) -------------------------------------------- */
-
-.tool-palette {
-  display: flex;
+/* Buttons that carry a label as well as an icon. */
+.btn {
+  display: inline-flex;
   align-items: center;
-  gap: 18px;
-  flex-wrap: wrap;
-  padding: 8px 16px;
-  background: #fafafb;
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 45px;
-  z-index: 9;
+  gap: 8px;
+  min-height: var(--tap);
+  padding: 0 16px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: var(--ink-700);
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--dur) ease, border-color var(--dur) ease;
 }
 
-.tool-group { display: flex; gap: 4px; }
+.btn:hover:not(:disabled) {
+  background: var(--ink-600);
+  border-color: var(--ink-500);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--white);
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: var(--accent-hi);
+  border-color: var(--accent-hi);
+}
+
+.btn.ghost {
+  background: transparent;
+}
+
+.file-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.file-button input[type='file'] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* ===========================================================================
+   TOOL RAIL — vertical, left, thumb-reachable on a tablet
+   ------------------------------------------------------------------------ */
+
+.tool-rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  background: var(--ink-800);
+  border-right: 1px solid var(--ink-650);
+  overflow-y: auto;
+  z-index: var(--z-chrome);
+}
+
+.rail-divider {
+  width: 32px;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--ink-650);
+  flex: none;
+}
 
 .tool {
-  font: inherit;
-  padding: 5px 12px;
-  border: 1px solid #bbb;
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
+  display: grid;
+  place-items: center;
+  gap: 2px;
+  width: 58px;
+  min-height: 52px;
+  padding: 6px 2px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--ink-200);
+  font-size: 11px;
+  font-weight: 500;
+  transition: background var(--dur) ease, color var(--dur) ease;
+  flex: none;
 }
 
-.tool:hover { background: #f0f0f2; }
+.tool:hover:not(:disabled) {
+  background: var(--ink-700);
+  color: var(--white);
+}
 
+.tool:disabled {
+  color: var(--ink-500);
+}
+
+/* Active state carries BOTH colour and a filled background, so it does not
+   depend on colour alone — a red/green deficiency still reads the selection. */
 .tool.active {
-  background: #111;
-  border-color: #111;
-  color: #fff;
+  background: var(--accent);
+  color: var(--white);
+}
+
+.tool-label {
+  line-height: 1.1;
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px 0;
 }
 
 .swatch {
   width: 26px;
   height: 26px;
-  border: 2px solid #fff;
-  border-radius: 6px;
-  box-shadow: 0 0 0 1px #bbb;
-  cursor: pointer;
+  border: 2px solid transparent;
+  border-radius: 50%;
   padding: 0;
+  transition: transform var(--dur) ease, box-shadow var(--dur) ease;
 }
 
-.swatch.active { box-shadow: 0 0 0 2px #111; }
+/* The swatch is the one place a transform is safe — it is absolutely sized and
+   sits in a grid cell, so growing it shifts nothing around it. */
+.swatch:hover {
+  transform: scale(1.12);
+}
 
-.stroke-picker { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+.swatch.active {
+  border-color: var(--white);
+  box-shadow: 0 0 0 2px var(--ink-800);
+}
 
-.stroke-picker select {
+.rail-select {
+  width: 58px;
+  min-height: 38px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: var(--ink-700);
+  color: var(--ink-100);
   font: inherit;
-  padding: 4px 8px;
-  border: 1px solid #bbb;
-  border-radius: 6px;
-  background: #fff;
+  font-size: 12px;
+  text-align: center;
+  cursor: pointer;
 }
 
-/* --- export ------------------------------------------------------------- */
-
-.toolbar button.primary {
-  background: #111;
-  border-color: #111;
-  color: #fff;
+.rail-select option {
+  background: var(--ink-700);
 }
 
-.toolbar button.primary:hover:not(:disabled) { background: #333; }
+/* ===========================================================================
+   STAGE — the sheet itself
+   ------------------------------------------------------------------------ */
 
-.notice {
-  margin: 12px 16px;
-  padding: 10px 12px;
-  border-radius: 6px;
-  background: #e9f6ec;
-  color: #145c2c;
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+  overflow: auto;
+  /* A faint grid, so a white sheet has something to sit on and the edges of
+     the paper are visible against the background. */
+  background-color: var(--ink-900);
+  background-image: radial-gradient(circle at 1px 1px, var(--ink-700) 1px, transparent 0);
+  background-size: 28px 28px;
+  z-index: var(--z-stage);
 }
 
-/* --- workspace + properties panel --------------------------------------- */
+/* position:relative + inline-block anchors the SVG overlay and shrinks the
+   wrapper to exactly the canvas, so the overlay's bounding rect equals the
+   canvas's. Load-bearing for coordinate accuracy — do not change to block. */
+.sheet-frame {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 18px 50px rgba(0, 0, 0, 0.45);
+}
 
-.workspace { display: flex; align-items: flex-start; flex: 1; min-height: 0; }
-.workspace .sheet-stage { flex: 1; min-width: 0; }
+.stage-empty {
+  display: grid;
+  place-items: center;
+  padding: 40px;
+}
+
+/* ===========================================================================
+   PROPERTIES PANEL
+   ------------------------------------------------------------------------ */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--ink-800);
+  border-left: 1px solid var(--ink-650);
+  overflow-y: auto;
+  z-index: var(--z-panel);
+}
+
+.panel-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 32px 24px;
+  text-align: center;
+  color: var(--ink-400);
+}
 
 .properties {
-  width: 260px;
-  flex: none;
-  padding: 14px 16px 18px;
-  background: #fff;
-  border-left: 1px solid var(--border);
-  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
 }
 
 .properties-header {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ink-650);
 }
 
-.properties-header strong { text-transform: capitalize; }
-.properties-header .muted { font-size: 11px; }
+.properties-header strong {
+  font-size: 15px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.properties-header .muted {
+  font-size: 12px;
+  margin-left: auto;
+}
 
 .properties-header .icon {
-  margin-left: auto;
-  font-size: 18px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-200);
+  font-size: 20px;
   line-height: 1;
-  border: none;
-  background: none;
-  cursor: pointer;
-  color: var(--muted);
-  padding: 0 4px;
+}
+
+.properties-header .icon:hover {
+  background: var(--ink-600);
+  color: var(--white);
+}
+
+.properties-locked {
+  border-left: 3px solid var(--status-review);
+}
+
+.properties-incomplete {
+  border-left: 3px solid var(--status-review);
 }
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 12px;
-  color: var(--muted);
-  font-size: 12px;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-200);
 }
 
 .field textarea,
+.field input,
 .field select {
   font: inherit;
-  font-size: 13px;
-  color: #111;
-  padding: 6px 8px;
-  border: 1px solid #bbb;
-  border-radius: 6px;
-  background: #fff;
+  /* 16px: anything less and iOS zooms the page when the field takes focus. */
+  font-size: 16px;
+  font-weight: 400;
+  min-height: 40px;
+  padding: 9px 11px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: var(--ink-900);
+  color: var(--paper);
   resize: vertical;
+  transition: border-color var(--dur) ease;
 }
 
-.small { font-size: 11px; }
+.field textarea::placeholder,
+.field input::placeholder {
+  color: var(--ink-400);
+}
 
-button.danger {
-  font: inherit;
+.field textarea:focus,
+.field input:focus,
+.field select:focus {
+  border-color: var(--accent-hi);
+}
+
+.field textarea[readonly],
+.field input[readonly],
+.field select:disabled {
+  background: var(--ink-700);
+  color: var(--ink-300);
+  cursor: not-allowed;
+}
+
+.field-invalid textarea,
+.field-invalid input {
+  border-color: var(--status-review);
+}
+
+.field-error {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: #e6b53d;
+}
+
+.attribution {
+  padding-top: 12px;
+  border-top: 1px solid var(--ink-650);
+  font-size: 12px;
+}
+
+.danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   width: 100%;
-  padding: 7px 12px;
-  border: 1px solid #c9342a;
-  border-radius: 6px;
-  background: #fff;
-  color: #c00;
-  cursor: pointer;
+  min-height: var(--tap);
+  border: 1px solid #7d2a20;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #f08a78;
+  font-size: 14px;
+  font-weight: 500;
+  transition: background var(--dur) ease;
 }
 
-button.danger:hover { background: #fdecea; }
+.danger:hover:not(:disabled) {
+  background: rgba(200, 68, 43, 0.16);
+}
 
-.tool:disabled { opacity: 0.4; cursor: default; }
+.danger:disabled {
+  opacity: 0.4;
+}
 
 /* ===========================================================================
-   ISSUED (SEALED) MARKUPS AND THE CONFIRMATION MODAL
-   ===========================================================================
-   A markup that has been issued in a flattened PDF is part of a document
-   somebody else is now holding, so it can no longer be changed here. These
-   rules are the visual half of that rule — the enforcement is in
-   EditorService, and nothing below is load-bearing for correctness.
-
-   Everything keys off `[data-sealed]`, which AnnotationLayer puts on the
-   wrapper it already draws around every markup. That is why none of the six
-   marker components needed touching, and why a seventh will get this styling
-   for free.
+   NOTICES
    ------------------------------------------------------------------------ */
 
-/* Faded, but still clearly legible. An issued markup is the record of what was
-   agreed — hiding it would be worse than not showing it at all. */
+.notice,
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.notice {
+  background: rgba(31, 157, 77, 0.14);
+  border: 1px solid rgba(31, 157, 77, 0.4);
+  color: #8ee0ab;
+}
+
+.error {
+  background: rgba(232, 52, 42, 0.14);
+  border: 1px solid rgba(232, 52, 42, 0.4);
+  color: #ff9c8d;
+}
+
+.notice-locked,
+.notice-incomplete {
+  background: rgba(208, 135, 0, 0.14);
+  border: 1px solid rgba(208, 135, 0, 0.42);
+  color: #f0c976;
+}
+
+.banner-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--ink-800);
+  border-bottom: 1px solid var(--ink-650);
+}
+
+/* ===========================================================================
+   OVERLAY STATES — issued and unfinished markups
+   ===========================================================================
+   Both key off an attribute AnnotationLayer puts on the wrapper it already
+   draws around every markup, so no marker component knows either concept
+   exists. Adding the second cost one attribute rather than six edits.
+   ------------------------------------------------------------------------ */
+
 [data-sealed] {
   opacity: 0.72;
   cursor: not-allowed;
 }
 
-/* Still selectable, so clicking one opens the panel that explains why it is
-   locked. Refusing the click would leave the user with no explanation at all. */
-[data-sealed]:hover { opacity: 0.85; }
-
-.properties-locked {
-  /* A quiet amber rail down the side. Enough to register before reading, not
-     so much that a read-only panel looks like an error. */
-  border-left: 3px solid #d08700;
+[data-sealed]:hover {
+  opacity: 0.88;
 }
 
-.properties-locked .field textarea,
-.properties-locked .field select {
-  background: #f6f6f4;
-  color: #555;
-  cursor: not-allowed;
+[data-incomplete] > * {
+  filter: drop-shadow(0 0 0 var(--status-review)) drop-shadow(0 0 3px var(--status-review));
 }
 
-.notice-locked {
-  margin: 0 0 4px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: #fdf6e3;
-  border: 1px solid #e8d8a8;
-  color: #6b5200;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-/* --- the confirmation modal --------------------------------------------- */
+/* ===========================================================================
+   MODALS
+   ------------------------------------------------------------------------ */
 
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 100;
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 16px;
-  background: rgba(17, 17, 17, 0.45);
+  padding: 20px;
+  background: rgba(8, 14, 20, 0.66);
+  backdrop-filter: blur(2px);
 }
 
 .modal {
-  width: min(480px, 100%);
+  width: min(500px, 100%);
   max-height: 90vh;
   overflow-y: auto;
-  padding: 20px 22px 18px;
-  border-radius: 10px;
-  background: #fff;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  padding: 22px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-lg);
+  background: var(--ink-800);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-wide {
+  width: min(640px, 100%);
 }
 
 .modal h2 {
-  margin: 0 0 12px;
-  font-size: 16px;
+  margin: 0 0 8px;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.modal-hint {
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--ink-300);
 }
 
 .modal-body {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.55;
-  color: #333;
+  color: var(--ink-100);
 }
 
-.modal-body p { margin: 0 0 10px; }
-.modal-body p:last-child { margin-bottom: 0; }
+.modal-body p {
+  margin: 0 0 10px;
+}
 
-/* The red top rule is reserved for the one action that cannot be undone. Using
-   it anywhere else would spend the signal. */
-.modal-danger { border-top: 3px solid #c9342a; }
+.modal-body p:last-child {
+  margin-bottom: 0;
+}
+
+.modal-body strong {
+  color: var(--white);
+}
+
+.modal-danger {
+  border-top: 3px solid var(--accent);
+}
+
+.modal .field {
+  margin-top: 14px;
+}
 
 .modal-actions {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 .modal-actions button {
-  font: inherit;
-  font-size: 13px;
-  padding: 7px 14px;
-  border: 1px solid #bbb;
-  border-radius: 6px;
-  background: #fff;
-  cursor: pointer;
+  min-height: var(--tap);
+  padding: 0 18px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: var(--ink-700);
+  color: var(--paper);
+  font-size: 14px;
+  font-weight: 500;
+  transition: background var(--dur) ease;
 }
 
-/* Width:100% from `button.danger` is for the panel's full-width Delete; inside
-   the modal these sit in a row, so it is overridden here rather than by
-   splitting the rule and touching the existing one. */
-.modal-actions button.danger,
-.modal-actions button.primary { width: auto; }
-
-.modal-actions button:hover { background: #f2f2f2; }
-.modal-actions button.danger:hover { background: #fdecea; }
-
-/* ===========================================================================
-   UNFINISHED MARKUPS
-   ===========================================================================
-   A pin with no description reaches the architect as a bare number on a
-   drawing. New pins cannot be in this state — the tool collects the
-   description and EditorService refuses a blank one — so what these rules
-   surface is work placed before that was required.
-
-   Like the seal, everything keys off an attribute AnnotationLayer puts on the
-   wrapper it already draws. No marker component knows the concept exists.
-   ------------------------------------------------------------------------ */
-
-/* An amber ring, drawn outside the marker so it reads as an annotation ON the
-   markup rather than a change to it. `paint-order` keeps the marker's own
-   stroke on top where the two overlap. */
-[data-incomplete] > * {
-  filter: drop-shadow(0 0 0 #d08700) drop-shadow(0 0 3px #d08700);
+.modal-actions button:hover:not(:disabled) {
+  background: var(--ink-600);
 }
 
-.properties-incomplete {
-  border-left: 3px solid #d08700;
+.modal-actions button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--white);
+  width: auto;
 }
 
-.field-invalid textarea,
-.field-invalid input {
-  border-color: #d08700;
-  background: #fffdf6;
+.modal-actions button.primary:hover:not(:disabled) {
+  background: var(--accent-hi);
 }
 
-.field-error {
-  margin-top: 4px;
-  font-size: 11px;
-  line-height: 1.4;
-  color: #8a6400;
-}
-
-.notice-incomplete {
-  margin: 0 0 10px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  background: #fff8e6;
-  border: 1px solid #e8d8a8;
-  color: #6b5200;
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-/* Who last touched this item (D14). Quiet — it is context, not content. */
-.attribution {
-  padding-top: 8px;
-  border-top: 1px solid #eee;
-}
-
-/* --- the prompt modal's field -------------------------------------------- */
-
-.modal .field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 12px;
-  font-size: 12px;
-  color: #555;
-}
-
-.modal .field textarea,
-.modal .field input {
-  font: inherit;
-  font-size: 13px;
-  color: #111;
-  padding: 8px 10px;
-  border: 1px solid #bbb;
-  border-radius: 6px;
-  background: #fff;
-  resize: vertical;
-}
-
-.modal .field textarea:focus,
-.modal .field input:focus {
-  outline: 2px solid #2563eb;
-  outline-offset: -1px;
-  border-color: #2563eb;
+.modal-actions button.danger {
+  width: auto;
+  background: transparent;
 }
 
 .modal-actions button:disabled {
+  opacity: 0.42;
+}
+
+/* ===========================================================================
+   PHOTO CAPTURE
+   ------------------------------------------------------------------------ */
+
+.photo-stage {
+  min-height: 260px;
+  display: grid;
+}
+
+.photo-choices {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.photo-choice {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  min-height: 190px;
+  padding: 20px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius);
+  background: var(--ink-700);
+  color: var(--paper);
+  text-align: center;
+  transition: background var(--dur) ease, border-color var(--dur) ease;
+}
+
+.photo-choice:hover:not(:disabled) {
+  background: var(--ink-650);
+  border-color: var(--accent);
+}
+
+.photo-choice:disabled {
   opacity: 0.45;
-  cursor: default;
+}
+
+.photo-choice-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.photo-choice-hint {
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--ink-300);
+}
+
+.photo-camera {
+  display: grid;
+  gap: 12px;
+}
+
+.photo-video {
+  width: 100%;
+  max-height: 46vh;
+  border-radius: var(--radius);
+  background: var(--ink-900);
+  object-fit: contain;
+}
+
+.photo-camera-actions {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  justify-items: center;
+}
+
+.photo-camera-actions .icon-button {
+  background: var(--ink-700);
+}
+
+/* A shutter, because on a tablet the capture control has to be unmistakable
+   and reachable with a thumb without looking. */
+.shutter {
+  display: grid;
+  place-items: center;
+  width: 68px;
+  height: 68px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--white);
+  transition: transform var(--dur) ease;
+}
+
+.shutter:active {
+  transform: scale(0.94);
+}
+
+.shutter-ring {
+  width: 56px;
+  height: 56px;
+  border: 3px solid var(--ink-800);
+  border-radius: 50%;
+}
+
+.photo-preview {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.photo-preview img {
+  max-width: 100%;
+  max-height: 44vh;
+  border-radius: var(--radius);
+  background: var(--ink-900);
+  object-fit: contain;
+}
+
+.photo-preview-note {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-300);
+  text-align: center;
+}
+
+.photo-thumb {
+  display: grid;
+  gap: 6px;
+}
+
+.photo-thumb img {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  background: var(--ink-900);
+  object-fit: contain;
+  max-height: 220px;
+}
+
+.photo-thumb-empty {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  min-height: 120px;
+  padding: 16px;
+  border: 1px dashed var(--ink-600);
+  border-radius: var(--radius-sm);
+  color: var(--status-review);
+  text-align: center;
+}
+
+.photo-thumb p {
+  margin: 0;
+}
+
+/* ===========================================================================
+   EMPTY STATE
+   ------------------------------------------------------------------------ */
+
+.empty-state {
+  max-width: 620px;
+  display: grid;
+  gap: 18px;
+  padding: 40px;
+  border: 1px solid var(--ink-700);
+  border-radius: var(--radius-lg);
+  background: var(--ink-800);
+  text-align: left;
+}
+
+.empty-state h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.empty-state p {
+  margin: 0;
+  color: var(--ink-200);
+  line-height: 1.6;
+  /* Comfortable measure — long lines are the quickest way to make an interface
+     feel like a document nobody reads. */
+  max-width: 62ch;
+}
+
+.empty-steps {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.empty-steps li {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 12px;
+  align-items: start;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ink-100);
+  counter-increment: step;
+}
+
+.empty-steps li::before {
+  content: counter(step);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--ink-700);
+  color: var(--accent-hi);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* ===========================================================================
+   COORDINATE INSPECTOR — the SCRUM-19 evidence panel
+   ------------------------------------------------------------------------ */
+
+.inspector {
+  border-top: 1px solid var(--ink-650);
+  background: var(--ink-800);
+  font-size: 13px;
+}
+
+.inspector-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.inspector table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.inspector th,
+.inspector td {
+  padding: 6px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--ink-700);
+  color: var(--ink-100);
+}
+
+.inspector th {
+  color: var(--ink-300);
+  font-weight: 500;
+}
+
+.inspector tr:hover td {
+  background: var(--ink-700);
+}
+
+.pass {
+  color: #6fd694;
+}
+
+.fail {
+  color: #ff9c8d;
+}
+
+/* ===========================================================================
+   RESPONSIVE — 1024 is an iPad in landscape, 768 portrait
+   ------------------------------------------------------------------------ */
+
+@media (max-width: 1180px) {
+  .app-body {
+    grid-template-columns: 68px minmax(0, 1fr) 310px;
+  }
+
+  .brand-name {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  /* The panel becomes a sheet over the stage rather than a column — at this
+     width a third column leaves the drawing too narrow to work on. */
+  .app-body,
+  .app-body.no-panel {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+
+  .panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(340px, 86vw);
+    box-shadow: -12px 0 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .panel:empty {
+    display: none;
+  }
+
+  .doc-chip strong {
+    max-width: 14ch;
+  }
+
+  .tool-label {
+    display: none;
+  }
+
+  .tool {
+    width: 48px;
+    min-height: var(--tap);
+  }
+
+  .photo-choices {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===========================================================================
+   SIZE CONTROL
+   ===========================================================================
+   Shown for any markup that has a size to change. A photo, a callout, a box, a
+   cloud, an arrow and a freehand stroke all qualify; a pin does not, and the
+   panel simply omits the row rather than disabling it — a control that can
+   never apply is worse than no control.
+   ------------------------------------------------------------------------ */
+
+.size-control {
+  display: grid;
+  grid-template-columns: var(--tap) 1fr var(--tap);
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: var(--ink-900);
+}
+
+.size-step {
+  display: grid;
+  place-items: center;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--ink-700);
+  color: var(--paper);
+  font-size: 22px;
+  line-height: 1;
+  transition: background var(--dur) ease;
+}
+
+.size-step:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--white);
+}
+
+.size-step:disabled {
+  opacity: 0.35;
+}
+
+.size-readout {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--ink-200);
+  text-align: center;
 }

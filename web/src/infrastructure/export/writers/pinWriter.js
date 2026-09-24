@@ -1,6 +1,7 @@
 import { PIN_KIND, PinStatus } from '../../../domain/annotations';
 import { PdfWriterRegistry } from '../PdfWriterRegistry';
 import { appendAnnotation, createAppearance, markupFields, num, DEFAULT_FONT_NAME } from '../pdfPrimitives';
+import { pinLabelOps } from './pinLabelOps';
 
 /** Pin radius in PDF points — matches PinMarker's on-screen radius. */
 const RADIUS = 11;
@@ -10,6 +11,18 @@ const STATUS_RGB = {
   [PinStatus.OPEN]: [0.91, 0.20, 0.16],
   [PinStatus.READY_FOR_REVIEW]: [0.89, 0.59, 0.04],
   [PinStatus.CLOSED]: [0.12, 0.62, 0.30],
+};
+
+/**
+ * How a status reads on the label drawn beside the pin.
+ *
+ * Short, because it sits on a drawing. The schedule spells it out in full; here
+ * the job is to answer "is this done?" at a glance while standing in the room.
+ */
+const STATUS_TAG = {
+  [PinStatus.OPEN]: 'OPEN',
+  [PinStatus.READY_FOR_REVIEW]: 'READY FOR REVIEW',
+  [PinStatus.CLOSED]: 'CLOSED',
 };
 
 /** Bézier constant for approximating a quarter circle: 4/3 * tan(PI/8). */
@@ -54,18 +67,57 @@ function circlePath(cx, cy, r) {
  * The lesson worth keeping: "correct per the spec" and "shows the user what
  * they drew" are different bars, and only the second one matters at a demo.
  */
-PdfWriterRegistry.register(PIN_KIND, (pin, { pdfDoc, page, author, font, index }) => {
+PdfWriterRegistry.register(PIN_KIND, (pin, { pdfDoc, page, author, font, index, ordinal }) => {
   const { x, y } = pin.getAnchor();
   const rgb = STATUS_RGB[pin.status] ?? STATUS_RGB[PinStatus.OPEN];
 
-  // 1-based number, matching the ordinal shown in the app and the inspector.
-  const label = String(index + 1);
+  // The number a person uses to refer to this item: its position among PINS,
+  // across the whole set. It is also the number printed on the schedule, which
+  // is the only reason the schedule is usable — see assignOrdinals.
+  //
+  // `index` is the fallback for a caller that does not number: it counts every
+  // markup on the sheet, so a pin drawn after two boxes came out as "3". That
+  // was the behaviour, and it is why this argument exists.
+  const label = String(ordinal ?? index + 1);
   const fontSize = RADIUS;
   const labelWidth = font.widthOfTextAtSize(label, fontSize);
 
-  const rect = [x - RADIUS - 2, y - RADIUS - 2, x + RADIUS + 2, y + RADIUS + 2];
+  // ==========================================================================
+  // THE DESCRIPTION, DRAWN ON THE DRAWING
+  // ==========================================================================
+  // A pin used to carry its description only in `/Contents`, which a viewer
+  // shows on hover. That is invisible on paper and gone entirely once the file
+  // is flattened, so an issued sheet showed a numbered circle and nothing to
+  // say what the item was — or whether it had been done.
+  //
+  // Reported as: "i need the pin description to show, or else how would we know
+  // if that thing is done or verified after completion".
+  //
+  // The layout comes from the domain, shared with the on-screen marker, so the
+  // export and the canvas show the same box in the same place.
+  const descriptionBox = pinLabelOps({
+    x,
+    y,
+    description: pin.label,
+    status: STATUS_TAG[pin.status] ?? pin.status,
+    rgb,
+    font,
+  });
+
+  // The rectangle has to contain everything the appearance draws. An annotation
+  // whose /Rect is smaller than its artwork is clipped by some viewers and
+  // mispositioned by the flattener, which maps the appearance's BBox onto it.
+  const rect = [
+    Math.min(x - RADIUS - 2, descriptionBox.bounds.left),
+    Math.min(y - RADIUS - 2, descriptionBox.bounds.bottom),
+    Math.max(x + RADIUS + 2, descriptionBox.bounds.right),
+    Math.max(y + RADIUS + 2, descriptionBox.bounds.top),
+  ];
 
   const ops = [
+    // Label first, so the pin sits ON TOP of the leader line rather than
+    // having it run across the disc.
+    ...descriptionBox.ops,
     // Filled disc in the status colour.
     `${num(rgb[0])} ${num(rgb[1])} ${num(rgb[2])} rg`,
     ...circlePath(x, y, RADIUS),

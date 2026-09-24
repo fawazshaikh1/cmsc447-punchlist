@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 
+import { useServices } from '../ServiceContainer';
 import { useSheetEditor } from '../hooks/useSheetEditor';
 import { useTextPrompt } from './PromptDialog';
+import { usePhotoCapture } from './PhotoCaptureDialog';
 import { useSourceAnnotations } from '../hooks/useSourceAnnotations';
 import { AnnotationLayer } from './AnnotationLayer';
 import { CoordinateInspector } from './CoordinateInspector';
@@ -24,6 +26,28 @@ export function SheetViewer({ sheetId, documentName, page, scale, rotation }) {
   // the sheet is a change to this file alone.
   const { ask: promptForText, dialog: promptDialog } = useTextPrompt();
 
+  // Photo capture, in two halves that belong in different tiers. The dialog
+  // produces a Blob — a presentation concern, it owns a camera and a file
+  // picker. `storePhoto` downscales and stores it, returning the MediaRef an
+  // annotation carries — infrastructure, wired in the composition root.
+  //
+  // The hook below sees neither: it asks for a photo and receives a reference.
+  const { ask: askForPhoto, dialog: photoDialog } = usePhotoCapture();
+  const { storePhoto } = useServices();
+
+  const capturePhoto = useCallback(
+    async (prompt) => {
+      const blob = await askForPhoto(prompt);
+      if (!blob) return null;
+
+      // Deliberately unguarded: a failure here (storage full, an unreadable
+      // HEIC) must reach the hook's error banner rather than being swallowed
+      // into a silent no-op that looks like the tool is broken.
+      return storePhoto(blob);
+    },
+    [askForPhoto, storePhoto],
+  );
+
   const editor = useSheetEditor({
     sheetId,
     documentName,
@@ -31,6 +55,7 @@ export function SheetViewer({ sheetId, documentName, page, scale, rotation }) {
     scale,
     rotation,
     promptForText,
+    capturePhoto,
   });
 
   // Comments that were already in the uploaded PDF. Read-only.
@@ -96,6 +121,7 @@ export function SheetViewer({ sheetId, documentName, page, scale, rotation }) {
   return (
     <>
       {promptDialog}
+      {photoDialog}
 
       <ToolPalette
         activeToolId={editor.toolId}
@@ -113,59 +139,80 @@ export function SheetViewer({ sheetId, documentName, page, scale, rotation }) {
         onToggleSource={() => setShowSource((on) => !on)}
       />
 
-      {editor.error && <p className="error">{editor.error}</p>}
-
-      <div className="workspace">
-        <div className="sheet-stage">
-          {/* .sheet-frame is position:relative + inline-block, which anchors the
-              absolutely-positioned overlay and shrinks the wrapper to exactly
-              the canvas, so the overlay's bounding rect equals the canvas's. */}
-          <div className="sheet-frame">
-            <SheetCanvas page={page} scale={scale} rotation={rotation} />
-            <AnnotationLayer
-              page={page}
-              scale={scale}
-              rotation={rotation}
-              annotations={editor.visible}
-              sourceAnnotations={sourceAnnotations}
-              showSource={showSource}
-              selectedId={editor.selectedId}
-              sealedIds={editor.sealedIds}
-              incompleteIds={editor.incompleteIds}
-              onSelect={selectById}
-              onGestureStart={editor.begin}
-              onGestureMove={editor.extend}
-              onGestureEnd={editor.finish}
-              onGestureCancel={editor.cancel}
-            />
-          </div>
+      {/* The stage and the panel are SIBLINGS of the rail, not nested inside a
+          wrapper, so all three are direct children of the `.app-body` grid.
+          That is what lets the panel become a slide-over at tablet width by
+          changing one grid definition rather than re-nesting anything. */}
+      <div className="stage">
+        {/* .sheet-frame is position:relative + inline-block, which anchors the
+            absolutely-positioned overlay and shrinks the wrapper to exactly the
+            canvas, so the overlay's bounding rect equals the canvas's. */}
+        <div className="sheet-frame">
+          <SheetCanvas page={page} scale={scale} rotation={rotation} />
+          <AnnotationLayer
+            page={page}
+            scale={scale}
+            rotation={rotation}
+            annotations={editor.visible}
+            sourceAnnotations={sourceAnnotations}
+            showSource={showSource}
+            selectedId={editor.selectedId}
+            sealedIds={editor.sealedIds}
+            incompleteIds={editor.incompleteIds}
+            onSelect={selectById}
+            onGestureStart={editor.begin}
+            onGestureMove={editor.extend}
+            onGestureEnd={editor.finish}
+            onGestureCancel={editor.cancel}
+          />
         </div>
-
-        <PropertiesPanel
-          annotation={editor.selected}
-          onUpdate={editor.update}
-          onDelete={editor.remove}
-          onClose={() => editor.select(null)}
-          // The panel is handed the DECISION, not the reason for it. It shows
-          // whatever explanation the policy gives, so when roles are switched
-          // on it renders those refusals correctly with no change here.
-          lock={editor.selected ? editor.lockFor(editor.selected) : undefined}
-          // What is still missing, and who last touched it. Both are looked up
-          // through the service, so the panel renders them without knowing what
-          // a rule is or where attribution is stored.
-          problems={editor.selected ? editor.problemsFor(editor.selected) : undefined}
-          lastChange={editor.selected ? editor.lastChangeFor(editor.selected) : null}
-        />
       </div>
 
-      <CoordinateInspector
-        page={page}
-        scale={scale}
-        rotation={rotation}
-        annotations={editor.annotations}
-        selectedId={editor.selectedId}
-        onClear={editor.clearSheet}
-      />
+      <aside className="panel">
+        {editor.error && (
+          <p className="error" style={{ margin: 12 }}>
+            {editor.error}
+          </p>
+        )}
+
+        {editor.selected ? (
+          <PropertiesPanel
+            annotation={editor.selected}
+            onUpdate={editor.update}
+            onDelete={editor.remove}
+            onClose={() => editor.select(null)}
+            // The panel is handed the DECISION, not the reason for it. It shows
+            // whatever explanation the policy gives, so when roles are switched
+            // on it renders those refusals correctly with no change here.
+            lock={editor.lockFor(editor.selected)}
+            // What is still missing, and who last touched it. Both are looked
+            // up through the service, so the panel renders them without knowing
+            // what a rule is or where attribution is stored.
+            problems={editor.problemsFor(editor.selected)}
+            lastChange={editor.lastChangeFor(editor.selected)}
+            // Passed only when the markup HAS a size, so the panel offers the
+            // control by capability rather than by checking a type.
+            onResize={editor.canResize(editor.selected) ? editor.resize : undefined}
+          />
+        ) : (
+          <div className="panel-empty">
+            <p className="small">
+              {editor.annotations.length === 0
+                ? 'No markups on this sheet yet. Pick a tool and tap the drawing.'
+                : 'Select a markup with the Select tool to edit it.'}
+            </p>
+          </div>
+        )}
+
+        <CoordinateInspector
+          page={page}
+          scale={scale}
+          rotation={rotation}
+          annotations={editor.annotations}
+          selectedId={editor.selectedId}
+          onClear={editor.clearSheet}
+        />
+      </aside>
     </>
   );
 }

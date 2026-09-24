@@ -7,6 +7,7 @@ import { useExport } from './presentation/hooks/useExport';
 import { SheetViewer } from './presentation/components/SheetViewer';
 import { Toolbar } from './presentation/components/Toolbar';
 import { useConfirmation } from './presentation/components/ConfirmDialog';
+import { Icon } from './presentation/components/Icon';
 import { FlattenExportNotice } from './presentation/components/SealingNotice';
 
 // Loading these three barrels is what registers every annotation type with
@@ -25,12 +26,17 @@ import './domain/rules';
 import './presentation/components/markers';
 
 /**
- * Application shell for the Sprint 1 / Sprint 2 PDF pipeline.
+ * Application shell.
  *
- * Scaffolding, not product. The real shell will have routing, a project picker,
- * auth and a punch-item panel. What matters architecturally is that replacing
- * it touches nothing below: the domain and infrastructure tiers have no idea
- * this file exists.
+ * Three regions: a top bar for the document and how it leaves, a tool rail down
+ * the left, and the sheet with its properties panel. `SheetViewer` renders the
+ * last three as siblings so they are direct children of the `.app-body` grid —
+ * which is what lets the panel become a slide-over at tablet width without any
+ * of them being re-nested.
+ *
+ * Still only a shell: routing, a project picker and sign-in all land in Sprint
+ * 2. What matters architecturally is that replacing it touches nothing below.
+ * The domain and infrastructure tiers have no idea this file exists.
  */
 export default function App() {
   const {
@@ -95,8 +101,13 @@ export default function App() {
     const { annotationCount, sheetCount, incompleteCount } =
       await exportsFlattened.summarize({ pageCount, sheetIdFor });
 
-    // Nothing to seal means nothing to warn about. Let the export run and
-    // report "no markups yet" itself rather than asking about zero items.
+    // None of OUR markups means nothing of ours gets sealed — but the file may
+    // still be covered in markups from a previous export, and flattening those
+    // is exactly what the user is asking for. So run it, and let the export
+    // report what it actually burned in.
+    //
+    // No confirmation in this case, deliberately: the seal is what the warning
+    // is about, and with nothing of ours to seal there is nothing to warn of.
     if (annotationCount === 0) {
       runExport(true);
       return;
@@ -155,36 +166,63 @@ export default function App() {
         isExporting={isExporting}
       />
 
-      {error && <p className="error">{error}</p>}
-      {(exportError || exportPrecheckError) && (
-        <p className="error">Export failed: {exportError ?? exportPrecheckError}</p>
+      {(error || exportError || exportPrecheckError || exportMessage) && (
+        <div className="banner-row">
+          {error && (
+            <p className="error">
+              <Icon name="alert" size={18} /> {error}
+            </p>
+          )}
+          {(exportError || exportPrecheckError) && (
+            <p className="error">
+              <Icon name="alert" size={18} /> Export failed: {exportError ?? exportPrecheckError}
+            </p>
+          )}
+          {exportMessage && (
+            <p className="notice">
+              <Icon name="check" size={18} /> {exportMessage}
+            </p>
+          )}
+        </div>
       )}
-      {exportMessage && <p className="notice">{exportMessage}</p>}
 
       {page && sheetId ? (
-        <SheetViewer
-          sheetId={sheetId}
-          documentName={fileName}
-          page={page}
-          scale={scale}
-          rotation={rotation}
-        />
+        <div className="app-body">
+          <SheetViewer
+            sheetId={sheetId}
+            documentName={fileName}
+            page={page}
+            scale={scale}
+            rotation={rotation}
+          />
+        </div>
       ) : (
-        !isLoading && (
-          <div className="empty-state">
-            <h1>Punch List &mdash; sheet markup</h1>
-            <p>Open an architectural PDF to begin.</p>
-            <ol>
-              <li>Pick a tool, drop pins and draw markups on the drawing.</li>
-              <li>Zoom, rotate and change sheets &mdash; markups stay anchored.</li>
-              <li>Reload the page &mdash; they come back in the same places.</li>
-              <li>
-                Export the marked-up PDF and open it in Acrobat &mdash; every markup is a
-                real, selectable PDF annotation, not a flattened picture.
-              </li>
-            </ol>
-          </div>
-        )
+        <div className="stage stage-empty">
+          {!isLoading && (
+            <div className="empty-state">
+              <h1>Mark up a drawing, issue it as a PDF</h1>
+              <p>
+                Open an architectural or engineering PDF to begin. Everything stays on this
+                device until you export &mdash; nothing is uploaded.
+              </p>
+              <ol className="empty-steps">
+                <li>Pick a tool from the left, then tap the drawing to place a markup.</li>
+                <li>
+                  Add a photo straight from the camera, or from a file, and it lands on the
+                  sheet where you tapped.
+                </li>
+                <li>
+                  Zoom, rotate and change sheets &mdash; every markup holds its exact point on
+                  the drawing. Reload and they come back.
+                </li>
+                <li>
+                  Issue the PDF and open it in Acrobat, Bluebeam or PlanGrid. The original
+                  drawing is never modified.
+                </li>
+              </ol>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

@@ -15,3 +15,4 @@ import './cloudWriter';
 import './arrowWriter';
 import './inkWriter';
 import './textWriter';
+import './photoWriter';

@@ -45,7 +45,20 @@ export class SheetExporter {
 
   /**
    * @param {ExportRequest} request
-   * @returns {Promise<Uint8Array>} The annotated PDF's bytes.
+   * @returns {Promise<Uint8Array | { bytes: Uint8Array, flattenedCount: number, flattenedPages: number }>}
+   *          The annotated PDF's bytes, optionally with a count of how many
+   *          annotations the exporter burned into the page, and onto how many
+   *          sheets.
+   *
+   *          Two shapes, because only one exporter has anything extra to say.
+   *          An exporter that merely appends annotations knows nothing the
+   *          caller does not already know, and returns bytes. A flattening one
+   *          also consumes annotations that were ALREADY in the file — markups
+   *          from a previous export, or from whoever sent the drawing — and the
+   *          caller cannot count those without parsing the PDF itself.
+   *
+   *          `ExportService` normalises both, so an implementation opts in by
+   *          returning the object and pays nothing by returning bytes.
    */
   exportAnnotated(request) {
     return abstractMethod('SheetExporter', 'exportAnnotated', request);

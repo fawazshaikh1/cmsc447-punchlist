@@ -120,6 +120,28 @@ export class TextMarkup extends Annotation {
     );
   }
 
+  /**
+   * A copy at a different type size.
+   *
+   * Clamped rather than rejected: the constructor refuses a non-positive size,
+   * and a user holding the minus button should hit a floor rather than an
+   * error. The ceiling stops a callout from covering the sheet it annotates.
+   *
+   * @param {number} factor
+   */
+  scaledBy(factor) {
+    const next = Math.min(96, Math.max(6, this.fontSize * factor));
+    return new TextMarkup(
+      this.id,
+      this.sheetId,
+      this.position,
+      this.text,
+      next,
+      this.style,
+      this.createdAt,
+    );
+  }
+
   serializePayload() {
     return { text: this.text, fontSize: this.fontSize, style: this.style.toJSON() };
   }

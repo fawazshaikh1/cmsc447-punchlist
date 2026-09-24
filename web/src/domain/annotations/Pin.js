@@ -26,7 +26,7 @@ export function isPinStatus(value) {
 /**
  * A punch-list item pinned to a location on a drawing sheet.
  *
- * This is the SCRUM-19 deliverable: the thing a user drops by tapping the
+ * The thing a user drops by tapping the
  * sheet, whose position must survive zoom, pan, rotation, reload and export. It
  * does that by storing its anchor as a PdfPoint and nothing else — no scale
  * factor, no screen offset, no viewport state.

@@ -231,6 +231,40 @@ export class EditorService {
   }
 
   /**
+   * Scales an annotation about its anchor.
+   *
+   * Works for every markup type that has a size without knowing which one it
+   * has, because `scaledBy` is a capability rather than a type check — exactly
+   * how `move` works through `movedBy`. A type with no meaningful size does not
+   * implement it, and `canResize` reports false so the interface offers nothing.
+   *
+   * @param {import('../annotations/Annotation').Annotation} annotation
+   * @param {number} factor 1.2 to grow, 1/1.2 to shrink.
+   */
+  async resize(annotation, factor) {
+    if (!this.canResize(annotation)) return annotation;
+
+    return this.update(
+      annotation,
+      annotation.scaledBy(factor),
+      'Resize',
+      EditPolicy.INTENT.RESIZE,
+    );
+  }
+
+  /**
+   * Whether this annotation has a size the user can change.
+   *
+   * A capability check, so a markup type gains a size control the moment it
+   * implements `scaledBy` and nothing here or in the panel changes.
+   *
+   * @param {import('../annotations/Annotation').Annotation} annotation
+   */
+  canResize(annotation) {
+    return typeof annotation?.scaledBy === 'function';
+  }
+
+  /**
    * Removes every annotation on a sheet that may be removed, as ONE undoable
    * step.
    *

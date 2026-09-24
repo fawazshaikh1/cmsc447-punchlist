@@ -49,6 +49,7 @@ export class RoleEditPolicy extends EditPolicy {
     admin: Object.freeze([
       EditPolicy.INTENT.CREATE,
       EditPolicy.INTENT.MOVE,
+      EditPolicy.INTENT.RESIZE,
       EditPolicy.INTENT.UPDATE,
       EditPolicy.INTENT.DELETE,
       EditPolicy.INTENT.STATUS,
@@ -57,6 +58,7 @@ export class RoleEditPolicy extends EditPolicy {
     power_collaborator: Object.freeze([
       EditPolicy.INTENT.CREATE,
       EditPolicy.INTENT.MOVE,
+      EditPolicy.INTENT.RESIZE,
       EditPolicy.INTENT.UPDATE,
       EditPolicy.INTENT.DELETE,
       EditPolicy.INTENT.STATUS,
