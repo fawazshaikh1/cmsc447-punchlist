@@ -940,4 +940,4 @@ happens once in the shared layout, before anything is measured, so both
 renderers work from identical text. Accented Latin survives; WinAnsi covers it.
 
 Verified visually, canvas against export: same wrap point, same box, same leader,
-same tag. `npm run verify` 64/64. Build clean, lint unchanged at 22.
+same tag. `npm run verify` 66/66. Build clean, lint unchanged at 22.
