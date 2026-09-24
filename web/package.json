@@ -7,6 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
+    "verify": "npm run verify:sealing && npm run verify:rules",
+    "verify:sealing": "node --import ./scripts/register-resolver.mjs scripts/verify-sealing.mjs",
+    "verify:rules": "node --import ./scripts/register-resolver.mjs scripts/verify-rules-and-attribution.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

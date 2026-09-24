@@ -50,6 +50,45 @@ function BrokenMarker({ annotation, project }) {
 }
 
 /**
+ * Pointer capture that cannot break the gesture it is trying to help.
+ *
+ * ===========================================================================
+ * WHY THESE ARE WRAPPED
+ * ===========================================================================
+ * `setPointerCapture` throws `NotFoundError` when the pointer id is not
+ * currently active — a fast tap whose pointer has already been released, a
+ * stylus the browser has re-issued under a new id, or a synthetic event from an
+ * assistive tool or a test harness.
+ *
+ * The optional call (`?.`) that used to be here guards the method being
+ * MISSING, not the method THROWING, so those cases escaped it.
+ *
+ * That became more costly when placing a pin started asking for a description:
+ * capture runs BEFORE the gesture is handed to the hook, so a throw here loses
+ * the whole tap — the drawing would simply not respond, with nothing to
+ * explain why.
+ *
+ * Capture is an enhancement, not a requirement. Losing it means a drag that
+ * leaves the sheet may not finish cleanly; losing the gesture means the tool
+ * appears broken. Swallowing is the right trade, and the only one.
+ */
+function capturePointer(element, pointerId) {
+  try {
+    element.setPointerCapture?.(pointerId);
+  } catch {
+    // See above: the gesture proceeds without capture.
+  }
+}
+
+function releasePointer(element, pointerId) {
+  try {
+    element.releasePointerCapture?.(pointerId);
+  } catch {
+    // Already released, or never captured. Nothing to undo.
+  }
+}
+
+/**
  * Transparent SVG sheet stacked over the canvas, carrying every annotation.
  *
  * ===========================================================================
@@ -80,6 +119,19 @@ function BrokenMarker({ annotation, project }) {
  * live entirely in this component, and none of the six marker components had to
  * change to gain either — which is the same "add, don't modify" property the
  * registries give the model.
+ *
+ * ---------------------------------------------------------------------------
+ * AND THE SAME TRICK MARKS ISSUED MARKUPS
+ * ---------------------------------------------------------------------------
+ * A markup that has been issued in a flattened PDF is drawn with a `data-sealed`
+ * attribute on that same wrapper, and one that is missing something it needs —
+ * a pin with no description — gets `data-incomplete`. The stylesheet does the
+ * rest. None of the six marker components knows either concept exists.
+ *
+ * Putting the state on the wrapper instead of passing `isSealed` / `isIncomplete`
+ * props is what keeps that true: a seventh markup type gets both treatments for
+ * free, and a marker author never has to remember to honour them. It is also why
+ * adding the second one just now cost one attribute rather than six components.
  */
 export function AnnotationLayer({
   page,
@@ -89,6 +141,8 @@ export function AnnotationLayer({
   sourceAnnotations,
   showSource,
   selectedId,
+  sealedIds,
+  incompleteIds,
   onSelect,
   onGestureStart,
   onGestureMove,
@@ -150,13 +204,17 @@ export function AnnotationLayer({
         // Capture so a drag that leaves the SVG still delivers move and up
         // events here. Without it, dragging past the sheet edge strands the
         // gesture forever with no pointerup to finish it.
-        event.currentTarget.setPointerCapture?.(event.pointerId);
+        capturePointer(event.currentTarget, event.pointerId);
         suppressClick.current = false;
-        onGestureStart(pointAt(event), hitTest(event));
+        // Deliberately not awaited: nothing here depends on the result, and the
+        // hook reports its own failures. `void` marks that as a decision rather
+        // than a forgotten await — begin() became async when placing a pin
+        // started asking for a description first.
+        void onGestureStart(pointAt(event), hitTest(event));
       }}
       onPointerMove={(event) => onGestureMove(pointAt(event))}
       onPointerUp={(event) => {
-        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        releasePointer(event.currentTarget, event.pointerId);
         suppressClick.current = onGestureEnd() === true;
       }}
       onPointerCancel={onGestureCancel}
@@ -189,7 +247,16 @@ export function AnnotationLayer({
         // Projecting the anchor can itself throw on a malformed annotation, so
         // it happens inside the boundary's scope, not before it.
         return (
-          <g key={annotation.id} data-annotation-id={annotation.id}>
+          <g
+            key={annotation.id}
+            data-annotation-id={annotation.id}
+            // Rendered only when true, so the attribute selector in the
+            // stylesheet stays a simple presence check.
+            data-sealed={sealedIds?.has(annotation.id) ? 'true' : undefined}
+            // Rendered only when true, so the attribute selectors in the
+            // stylesheet stay simple presence checks.
+            data-incomplete={incompleteIds?.has(annotation.id) ? 'true' : undefined}
+          >
             <ErrorBoundary
               // Remounting on any geometry change clears a previous failure, so
               // a markup that broke while being dragged through a bad state

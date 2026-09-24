@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { useSheetEditor } from '../hooks/useSheetEditor';
+import { useTextPrompt } from './PromptDialog';
 import { useSourceAnnotations } from '../hooks/useSourceAnnotations';
 import { AnnotationLayer } from './AnnotationLayer';
 import { CoordinateInspector } from './CoordinateInspector';
@@ -16,8 +17,21 @@ import { ToolPalette } from './ToolPalette';
  * tool or annotation type, and does not know what undo is — those rules live in
  * `AnnotationService`, the tools, and `EditorService` respectively.
  */
-export function SheetViewer({ sheetId, page, scale, rotation }) {
-  const editor = useSheetEditor({ sheetId, page, scale, rotation });
+export function SheetViewer({ sheetId, documentName, page, scale, rotation }) {
+  // How a tool that declares `requiresText()` gets its text. Owned here rather
+  // than inside the hook so the hook stays free of JSX and of any opinion about
+  // HOW the question is asked — replacing this modal with an inline editor on
+  // the sheet is a change to this file alone.
+  const { ask: promptForText, dialog: promptDialog } = useTextPrompt();
+
+  const editor = useSheetEditor({
+    sheetId,
+    documentName,
+    page,
+    scale,
+    rotation,
+    promptForText,
+  });
 
   // Comments that were already in the uploaded PDF. Read-only.
   //
@@ -65,7 +79,11 @@ export function SheetViewer({ sheetId, page, scale, rotation }) {
       }
       if ((event.key === 'Delete' || event.key === 'Backspace') && editor.selected) {
         event.preventDefault();
-        editor.remove(editor.selected);
+        // A keyboard shortcut bypasses the disabled Delete button, so the lock
+        // has to be honoured here too. EditorService would refuse the write
+        // anyway; checking first means the user gets silence rather than an
+        // error banner for pressing a key that was never going to work.
+        if (editor.lockFor(editor.selected).allowed) editor.remove(editor.selected);
         return;
       }
       if (event.key === 'Escape') editor.select(null);
@@ -77,6 +95,8 @@ export function SheetViewer({ sheetId, page, scale, rotation }) {
 
   return (
     <>
+      {promptDialog}
+
       <ToolPalette
         activeToolId={editor.toolId}
         onSelectTool={editor.selectTool}
@@ -110,6 +130,8 @@ export function SheetViewer({ sheetId, page, scale, rotation }) {
               sourceAnnotations={sourceAnnotations}
               showSource={showSource}
               selectedId={editor.selectedId}
+              sealedIds={editor.sealedIds}
+              incompleteIds={editor.incompleteIds}
               onSelect={selectById}
               onGestureStart={editor.begin}
               onGestureMove={editor.extend}
@@ -124,6 +146,15 @@ export function SheetViewer({ sheetId, page, scale, rotation }) {
           onUpdate={editor.update}
           onDelete={editor.remove}
           onClose={() => editor.select(null)}
+          // The panel is handed the DECISION, not the reason for it. It shows
+          // whatever explanation the policy gives, so when roles are switched
+          // on it renders those refusals correctly with no change here.
+          lock={editor.selected ? editor.lockFor(editor.selected) : undefined}
+          // What is still missing, and who last touched it. Both are looked up
+          // through the service, so the panel renders them without knowing what
+          // a rule is or where attribution is stored.
+          problems={editor.selected ? editor.problemsFor(editor.selected) : undefined}
+          lastChange={editor.selected ? editor.lastChangeFor(editor.selected) : null}
         />
       </div>
 

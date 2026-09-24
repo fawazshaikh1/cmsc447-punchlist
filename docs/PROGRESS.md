@@ -4,9 +4,9 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-09-07
+**Last updated:** 2026-09-18
 **Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go · PostgreSQL · AWS (S3, RDS)
-**Codebase:** 80 source files, ~7,180 lines
+**Codebase:** 115 source files, ~11,323 lines
 
 ---
 
@@ -23,6 +23,14 @@ easy to write.
 | Live drag preview | **Done** | Draft renders through the same marker component |
 | **Undo / redo** | **Done** | Add, move, edit, delete, clear — all reversible |
 | **Select + drag to reposition** | **Done** | `(200,642) → (350,532)`, undo restores exactly |
+| **Issued markups become read-only** | **Done** | `npm run verify:sealing` (10/10) + browser: 6 pins locked, survived reload |
+| **Confirmation before closing an item** | **Done** | Dialog shown; status stays Open until confirmed |
+| **Confirmation before issuing a flattened PDF** | **Done** | "6 markups on 1 sheet will become permanent" |
+| **Permission seam for roles** | **Ready, not wired** | `RoleEditPolicy` written; verify script proves a new policy needs no edits |
+| **A pin must have a description** | **Done** | Prompted at placement; `npm run verify` (16/16) incl. whitespace and repair paths |
+| **Unfinished items surfaced** | **Done** | Marked on sheet + panel; export confirmation names the count |
+| **Who changed what, and when** | **Done** | Change log per annotation; shown in the panel |
+| **Sign-in seam for Sprint 2** | **Ready, not wired** | `SessionIdentityProvider` written; verify script signs a user in by swapping one argument |
 | **Edit pin description + status** | **Done** | Persisted and undoable |
 | **Delete a markup** | **Done** | Undoable; panel closes; selection cleared |
 | Keyboard: Ctrl/Cmd+Z, Shift+Z, Delete, Esc | **Done** | Bound in SheetViewer, ignored while typing |
@@ -390,3 +398,247 @@ q 1 0 0 1   0   0 cm /PLMarkup2 Do Q      <- our box   (BBox === Rect)
 Our own markups get the identity, so nothing that already worked can regress —
 which is also precisely why the bug stayed hidden for as long as we only ever
 flattened our own work.
+
+### 2026-09-18 — Issued work becomes permanent, and the seam for roles
+
+Two requirements that look unrelated turned out to be one: *may this be changed
+right now?* Sealing after a flattened export and refusing an edit a user's role
+does not cover are the same question asked of different facts. Building them as
+one `EditPolicy` contract is what let roles be **prepared without being turned
+on**, which is what was asked for.
+
+**What changed, and what deliberately did not.**
+
+| Added | Edited | Untouched |
+|---|---|---|
+| `domain/policy/` (7 files) | `EditorService` — asks the policy | all 6 annotation types |
+| `domain/export/ExportRecord.js` | `ExportService` — records the export | all 6 marker components |
+| `ExportHistoryRepository` + 2 adapters | `SheetExporter` — gained `seals()` | all 6 tools |
+| `ConfirmDialog.jsx`, `SealingNotice.jsx` | `ServiceContainer` — wiring | all 6 PDF writers |
+| `scripts/verify-sealing.mjs` | 4 presentation files | the repository contract |
+
+The right-hand column is the point. Eighteen of the classes most likely to be
+touched by "add a rule about editing" were not opened.
+
+**The design decision worth defending in a review: the seal is not a flag.**
+
+There is no `sealed` boolean on an annotation. A flattened export writes an
+`ExportRecord` naming what it contained, and *sealed* is derived from it. That
+meant no field on the base class, no edit to any markup type, and no migration
+of JSON already in users' browsers — and it produced the D14 audit trail
+("issued by X on the 18th, with 11 others") as a side effect rather than as a
+second feature.
+
+**Only flattened exports seal.** Flattening paints markups into the page, so the
+recipient holds a drawing that cannot be un-drawn. A native export writes live
+annotation objects any reader can move — a working copy. The exporter answers
+this about itself (`SheetExporter.seals()`), so `ExportService` never learns
+which formats are which.
+
+**Three things that were not obvious while building it.**
+
+1. **The policy has to be synchronous.** It runs during render, in the
+   properties panel. An async check would produce a frame where a sealed markup
+   looks editable — long enough for someone to start typing into a box that was
+   never going to save. Hence `ActiveSeals`: read the sheet's seals once on
+   open, hold them in a small observable, subscribe with
+   `useSyncExternalStore` so a concurrent render cannot tear.
+2. **Undo is a second door, and the policy cannot see it.** A command replays a
+   stored write directly, so it would walk straight past the check. Issuing
+   therefore clears the history. The cost is the user's undo stack at the moment
+   they issue a document, which is a fair trade against an undo button that
+   quietly breaks a promise.
+3. **Clear-sheet had to be partial, not all-or-nothing.** A sheet issued last
+   week and worked on since holds both kinds. Refusing outright would leave no
+   way to clear the new markups; deleting everything would break the promise.
+   It now removes what it may, keeps the rest, and reports the count — silently
+   removing fewer items than the button implies would be its own kind of lie.
+
+**Verified.**
+
+* `npm run verify:sealing` — 10/10, against the real domain classes with no UI
+  and no test framework. Includes the bypass case: `update`, `move` and `remove`
+  on a sealed markup all throw `EditNotPermittedError`, and the stored
+  annotation is confirmed untouched afterwards.
+* In the browser, on a 2-page drawing: 6 pins issued → export record written
+  (`mode: "flattened"`, 6 ids) → all 6 marked `data-sealed` → panel read-only
+  with the explanation → **survived a page reload and re-open** → a 7th pin
+  added afterwards is fully editable.
+* Closing an item shows the dialog, and the status stays `Open` behind it until
+  confirmed.
+* `npm run lint` — 9 warnings, all pre-existing patterns. `npm run build` clean.
+
+**Documentation.** `REQUIREMENTS.md` is now **v1.3**: D5 is revised (closing
+locks nothing; issuing does), FR-3.8, FR-3.9, FR-6.8, FR-6.9 and FR-6.10 are
+new, and **open question 1 is closed** — the stakeholder no longer needs to
+answer it, because the answer built here is better than either option we
+offered them.
+
+**Not done, on purpose.** Roles are not assigned. `RoleEditPolicy` is written,
+carries the three roles the stakeholder described, and is one uncommented line
+away in `ServiceContainer.jsx`. The verify script includes a check that proves a
+second policy slots in without editing `EditorService`.
+
+### 2026-09-18 (later) — A pin must say what is wrong, and every change is signed
+
+Two asks that pull in opposite directions: one hard rule that must hold now, and
+one capability that must arrive later without disturbing anything. They wanted
+different mechanisms, and separating them was most of the work.
+
+**The rule: a punch item needs a description.**
+
+Enforced in two places, deliberately.
+
+* `PinTool.requiresText()` now collects it **before the pin exists**, so it is
+  never stored blank even momentarily. The tool supplies its own wording through
+  a new `getTextPrompt()` — which is why a pin asks "What needs fixing?" and a
+  callout asks for "Callout text" with no conditional in the presentation layer.
+* `EditorService` refuses an incomplete write regardless, covering any future
+  import, sync or bulk path that never goes near a tool.
+
+Rules are a fifth registry (`AnnotationRuleRegistry`). Adding "a pin needs a
+responsible company" in Sprint 2 is a class plus one line — `Pin.js` is not
+reopened. Registration lives in the barrel rather than in each rule file,
+because *which* rules a project enforces is a policy decision, not a property of
+the rule.
+
+The subtle part is `update`. It does NOT demand completeness; it demands that an
+edit does not **introduce** a problem:
+
+    complete   -> incomplete   refused
+    incomplete -> incomplete   allowed
+    incomplete -> complete     allowed
+
+Without that, pins placed before the rule existed would have been frozen —
+unmovable and, worse, unfixable, because saving the missing description is
+itself an update to something incomplete.
+
+**The capability: attribution, ready for sign-in.**
+
+Nothing was added to the annotation model. Every change writes a `ChangeRecord`
+instead — the same pattern as `ExportRecord`, and for the same reasons. No field
+on the base class, nothing for six `with*` methods to remember to carry through,
+and the full history D14 asks for rather than only the last change.
+
+The seam is `IdentityProvider`. `EditorService` has asked `identity.current()`
+on every write since it was written; `ChangeRecord` stores it, `ExportRecord`
+stamps it, and `RoleEditPolicy` reads the role off it. Sprint 2 is one line:
+
+    - new StaticIdentityProvider()
+    + new SessionIdentityProvider('/api')
+
+`SessionIdentityProvider` is written and unwired, with the Go endpoint it
+expects documented in the file. A verify check signs a user in by swapping that
+one argument and asserts the log names them — so if the promise ever stops being
+true, the suite says so rather than a teammate finding out in April.
+
+Threaded comments (FR-11) will need no new storage: `comment` is already in the
+intent vocabulary, so recording one is a `ChangeRecord` with the text in
+`detail`.
+
+**Three bugs found while verifying — two of them real.**
+
+1. **`window.prompt` had to go.** It was always marked temporary; making a
+   description mandatory turned the crudest thing in the app into the one users
+   meet most. It is single-line, blocks the pdf.js render, and — the reason it
+   was untenable — browsers suppress it after repeated use, which for a required
+   field means pin placement silently stops working. Replaced with a proper
+   modal, which upgrades the Text tool for free.
+2. **The dialog dismissed itself with the tap that opened it.** The prompt opens
+   during `pointerdown`; by the time `click` was dispatched the backdrop had
+   rendered under the cursor and took it. Intermittent — it depended on whether
+   React had committed first — so it would have been reported as "sometimes pins
+   do not work". Fixed in `useBackdropDismiss`: a backdrop click only counts if
+   the gesture *began* on the backdrop.
+3. **The text field lost focus to the tail of that same gesture.**
+   `document.activeElement` was `BODY` and everything typed went nowhere. On a
+   desktop that is one extra click; on an iPad it means no keyboard, turning the
+   most repeated action in the product into two taps. Fixed in `useAutoFocus`.
+
+A fourth came out of the verify script rather than the browser: `latestBySheet`
+compared timestamps with `>`, so two changes inside the same millisecond
+resolved to the OLDER one. Placing a pin and immediately dragging it does
+exactly that on a fast machine, and the panel would have reported "added" for a
+markup the user had just moved. Now `>=` with append order, in both adapters,
+and noted for the SQL version.
+
+**Verified.** `npm run verify` — 26/26 (10 sealing, 16 rules and attribution).
+In the browser: the prompt appears with pin-specific wording and a disabled
+confirm; whitespace keeps it disabled; a described pin saves and is logged as
+"this device added it"; a seeded pre-rule pin shows amber on the sheet, an
+inline reason in the panel, and repairs cleanly to a `update / Describe` log
+entry; the export confirmation reads "1 pin has no description" with correct
+singular grammar. Build clean, lint 10 warnings (all pre-existing patterns).
+
+**Documentation.** `REQUIREMENTS.md` is now **v1.4** — D16 and D17 added,
+FR-3.10 to FR-3.12, FR-6.11 and FR-11.0 new.
+
+### 2026-09-18 (debug pass) — five defects found and fixed before the PR
+
+A deliberate review-and-test pass over everything added today, rather than
+trusting that it worked because the happy path did. Four of the five were real,
+and three of them were the kind that only show up on someone else's machine.
+
+**1. `begin()` could lose a tap silently.** It became `async` when placing a pin
+started asking for a description first, so a throw inside it turned into an
+unhandled rejection instead of an error anyone would see. The selection branch
+sat outside the `try` and calls `toClampedPdfPoint`, which asserts its
+argument's coordinate space. The whole body is now guarded.
+
+**2. `setPointerCapture` could throw away the gesture.** It raises
+`NotFoundError` when the pointer id is not currently active — a fast tap whose
+pointer was already released, a stylus the browser re-issued under a new id, a
+synthetic event. The existing `?.` guards the method being *missing*, not
+*throwing*. Because capture runs BEFORE the gesture reaches the hook, a throw
+lost the entire tap and the drawing simply would not respond. Wrapped: capture
+is an enhancement, and losing it costs far less than losing the gesture.
+
+**3. Rule de-duplication did not survive hot reload.** Editing a rule file
+re-runs the barrel with a brand new class object, so the identity check let a
+duplicate through and the panel reported one missing description twice. Now
+identity **plus** class name, with the name check confined to development —
+because a minifier renames classes, and two rules collapsing to the same short
+name would silently drop one in production.
+
+**4. `listForAnnotation` ordered ties arbitrarily.** The same millisecond
+problem already fixed in `latestBySheet`, still present in its neighbour. ISO
+timestamps resolve to the millisecond and several changes routinely land inside
+one — clearing a sheet records every removal in a tight loop. "The most recent
+change" could be any of them. Now sorted by timestamp with append order as the
+tiebreak, in both adapters, and noted for the SQL version.
+
+Two of these were caught by the verify script rather than the browser, which is
+the argument for having written it.
+
+**5. Undo and redo were not audited.** They replay a stored write straight to
+the repository, walking past the recording step — so the log would keep
+reporting an edit that had just been reversed, and "last updated by" would
+describe something no longer true. Fixed by adding `Command.affects()`: a
+non-required method with a safe default of `[]`, overridden by the four
+concrete commands. `EditorService` records against whatever the command says it
+touched, so a fifth command type is audited the moment it answers the question —
+no conditional anywhere.
+
+**Also fixed, cosmetic but not trivial:** the Undo button stayed lit
+immediately after issuing a flattened PDF. Clicking it was harmless, but a
+live-looking Undo is the wrong thing to show at the exact moment a user has been
+told their work is now permanent. The history is cleared out of band by issuing
+(and by opening another drawing), so the undo state now re-reads on those too.
+
+**Checked and NOT a defect:** a batch of `useServices() must be called inside a
+<ServiceContainer>` errors in the console turned out to be Vite hot-reload
+artifacts from editing the context module with the page open. A fresh tab loads
+with a completely clean console.
+
+**Final state.** `npm run verify` 28/28 (10 sealing, 18 rules and attribution).
+Build clean. Lint 18 warnings, all in two known categories: the deliberate
+`revision` / `sealedIds` memo dependencies that the linter cannot see are
+load-bearing, and `only-export-components` on files that export a hook beside a
+component.
+
+Browser pass on a two-sheet drawing: pin and callout prompts each carry their
+own wording and field type; whitespace keeps the confirm disabled; Escape and
+Cancel create nothing; a described pin saves and logs as "this device added it";
+sheets keep separate annotations and separate logs; undo removes the pin and
+records the undo; a flattened export completes, writes `exportedBy: "this
+device"`, seals its markups and disables Undo.

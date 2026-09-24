@@ -89,6 +89,35 @@ export class AnnotationTool {
   }
 
   /**
+   * How to ask for that text.
+   *
+   * =========================================================================
+   * WHY THE TOOL SUPPLIES THE WORDING AND THE DIALOG DOES NOT
+   * =========================================================================
+   * "Callout text:" and "What needs fixing here?" are asking for completely
+   * different things, and the tool is the only object that knows which. If the
+   * dialog chose, it would need to branch on tool id — a conditional in the
+   * presentation layer that every new tool would have to come back and edit,
+   * which is the exact pattern this contract exists to prevent.
+   *
+   * The tool describes the request; the presentation layer decides how to
+   * render it. Swapping today's modal for an inline editor on the sheet
+   * changes one component and no tools.
+   *
+   * @returns {{ title: string, label: string, placeholder: string,
+   *             confirmLabel: string, multiline: boolean }}
+   */
+  getTextPrompt() {
+    return {
+      title: 'Add text',
+      label: 'Text',
+      placeholder: '',
+      confirmLabel: 'Add',
+      multiline: false,
+    };
+  }
+
+  /**
    * True for a tool that manipulates EXISTING annotations rather than creating
    * new ones — currently only SelectTool.
    *
