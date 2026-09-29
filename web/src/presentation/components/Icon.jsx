@@ -147,6 +147,13 @@ const PATHS = {
       <path d="M3.5 12.5L12 17l8.5-4.5" />
     </>
   ),
+  // A window with its right-hand column marked off — the side panel.
+  panel: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="1.5" />
+      <path d="M14.5 4.5v15" />
+    </>
+  ),
   switchCamera: (
     <>
       <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h2.2l1.1-1.8A1.5 1.5 0 0 1 9.1 4.5h5.8a1.5 1.5 0 0 1 1.3.7L17.3 7h2.2A1.5 1.5 0 0 1 21 8.5v9A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />

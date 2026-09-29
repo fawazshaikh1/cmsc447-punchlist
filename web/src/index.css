@@ -540,6 +540,33 @@ button:disabled {
   z-index: var(--z-panel);
 }
 
+/* `.panel` sets display, which would otherwise override the hidden attribute. */
+.panel[hidden] {
+  display: none;
+}
+
+/* The panel's own title row, holding the control that hides it. Sticky so the
+   way out stays in reach when a long change log scrolls the panel. */
+.panel-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 4px 4px 16px;
+  background: var(--ink-800);
+  border-bottom: 1px solid var(--ink-650);
+}
+
+.panel-bar-title {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-300);
+}
+
 .panel-empty {
   display: grid;
   place-items: center;

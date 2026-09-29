@@ -7,6 +7,7 @@ import { usePhotoCapture } from './PhotoCaptureDialog';
 import { useSourceAnnotations } from '../hooks/useSourceAnnotations';
 import { AnnotationLayer } from './AnnotationLayer';
 import { CoordinateInspector } from './CoordinateInspector';
+import { Icon } from './Icon';
 import { PropertiesPanel } from './PropertiesPanel';
 import { SheetCanvas } from './SheetCanvas';
 import { ToolPalette } from './ToolPalette';
@@ -19,7 +20,15 @@ import { ToolPalette } from './ToolPalette';
  * tool or annotation type, and does not know what undo is — those rules live in
  * `AnnotationService`, the tools, and `EditorService` respectively.
  */
-export function SheetViewer({ sheetId, documentName, page, scale, rotation }) {
+export function SheetViewer({
+  sheetId,
+  documentName,
+  page,
+  scale,
+  rotation,
+  panelOpen,
+  onPanelOpenChange,
+}) {
   // How a tool that declares `requiresText()` gets its text. Owned here rather
   // than inside the hook so the hook stays free of JSX and of any opinion about
   // HOW the question is asked — replacing this modal with an inline editor on
@@ -74,6 +83,12 @@ export function SheetViewer({ sheetId, documentName, page, scale, rotation }) {
     (annotation) => editor.select(annotation.id),
     [editor],
   );
+
+  // The panel is the only place editor errors are shown, so a new one brings it
+  // back even if the user hid it — a refused edit must not fail silently.
+  useEffect(() => {
+    if (editor.error) onPanelOpenChange(true);
+  }, [editor.error, onPanelOpenChange]);
 
   // Keyboard shortcuts. Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z are what every user
   // already has in their fingers; Delete removes the selection; Escape clears
@@ -137,6 +152,8 @@ export function SheetViewer({ sheetId, documentName, page, scale, rotation }) {
         sourceCount={sourceAnnotations.length}
         showSource={showSource}
         onToggleSource={() => setShowSource((on) => !on)}
+        panelOpen={panelOpen}
+        onTogglePanel={() => onPanelOpenChange(!panelOpen)}
       />
 
       {/* The stage and the panel are SIBLINGS of the rail, not nested inside a
@@ -168,7 +185,23 @@ export function SheetViewer({ sheetId, documentName, page, scale, rotation }) {
         </div>
       </div>
 
-      <aside className="panel">
+      {/* Hidden rather than unmounted, so a half-typed description and the
+          inspector's open/closed state survive hiding the panel and bringing
+          it back. */}
+      <aside className="panel" hidden={!panelOpen}>
+        <div className="panel-bar">
+          <span className="panel-bar-title">Details</span>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => onPanelOpenChange(false)}
+            aria-label="Hide panel"
+            title="Hide panel — bring it back with Panel at the top of the tool rail"
+          >
+            <Icon name="close" size={18} />
+          </button>
+        </div>
+
         {editor.error && (
           <p className="error" style={{ margin: 12 }}>
             {editor.error}
