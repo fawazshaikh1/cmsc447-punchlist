@@ -15,6 +15,10 @@ import { Icon } from './Icon';
  * to it. Giving both the same weight would make the irreversible action as easy
  * to hit by accident as the reversible one.
  *
+ * The same weighting decides what gives way on a narrow screen: "Working copy"
+ * drops to its icon before "Issue PDF" loses its label. Labels are hidden
+ * visually, never removed, so every button keeps its accessible name.
+ *
  * @param {object} props
  * @param {string | null} props.fileName
  * @param {number} props.pageCount
@@ -59,133 +63,135 @@ export function Toolbar({
   const canPage = pageCount > 1;
 
   return (
-    <header className="topbar">
-      <div className="brand">
-        <span className="brand-mark" aria-hidden="true">
-          <Icon name="pin" size={18} />
-        </span>
-        <span className="brand-name">Punch List</span>
+    <header className={fileName ? 'topbar has-document' : 'topbar'}>
+      <div className="topbar-doc">
+        <div className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            <Icon name="pin" size={18} />
+          </span>
+          <span className="brand-name">Punch List</span>
+        </div>
+
+        <label className="btn file-button" title="Open an architectural PDF">
+          <Icon name="file" size={18} />
+          <span className="btn-label">{fileName ? 'Open another' : 'Open drawing'}</span>
+          <input type="file" accept="application/pdf" onChange={handleFileChange} />
+        </label>
+
+        {(fileName || isLoading) && (
+          <span className="doc-chip" title={isLoading ? undefined : fileName}>
+            <Icon name="layers" size={16} />
+            <strong>{isLoading ? 'Opening…' : fileName}</strong>
+          </span>
+        )}
+
+        {canPage && (
+          <div className="sheet-nav">
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => onSelectPage(pageIndex - 1)}
+              disabled={pageIndex === 0}
+              aria-label="Previous sheet"
+              title="Previous sheet"
+            >
+              <span aria-hidden="true">&#8249;</span>
+            </button>
+
+            <select
+              value={pageIndex}
+              onChange={(event) => onSelectPage(Number(event.target.value))}
+              aria-label="Sheet"
+            >
+              {Array.from({ length: pageCount }, (_, index) => (
+                <option key={index} value={index}>
+                  Sheet {index + 1} of {pageCount}
+                </option>
+              ))}
+            </select>
+
+            <button
+              type="button"
+              className="icon-button"
+              onClick={() => onSelectPage(pageIndex + 1)}
+              disabled={pageIndex >= pageCount - 1}
+              aria-label="Next sheet"
+              title="Next sheet"
+            >
+              <span aria-hidden="true">&#8250;</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      <label className="btn file-button" title="Open an architectural PDF">
-        <Icon name="file" size={18} />
-        {fileName ? 'Open another' : 'Open drawing'}
-        <input type="file" accept="application/pdf" onChange={handleFileChange} />
-      </label>
-
-      {(fileName || isLoading) && (
-        <span className="doc-chip">
-          <Icon name="layers" size={16} />
-          <strong>{isLoading ? 'Opening…' : fileName}</strong>
-        </span>
-      )}
-
-      {canPage && (
-        <div className="sheet-nav">
+      <div className="topbar-actions">
+        <div className="topbar-group">
           <button
             type="button"
             className="icon-button"
-            onClick={() => onSelectPage(pageIndex - 1)}
-            disabled={pageIndex === 0}
-            aria-label="Previous sheet"
-            title="Previous sheet"
+            onClick={onZoomOut}
+            aria-label="Zoom out"
+            title="Zoom out"
           >
-            <span aria-hidden="true">&#8249;</span>
+            <Icon name="zoomOut" />
           </button>
 
-          <select
-            value={pageIndex}
-            onChange={(event) => onSelectPage(Number(event.target.value))}
-            aria-label="Sheet"
+          <button
+            type="button"
+            className="icon-button readout mono"
+            onClick={onResetZoom}
+            title="Reset zoom to 100%"
           >
-            {Array.from({ length: pageCount }, (_, index) => (
-              <option key={index} value={index}>
-                Sheet {index + 1} of {pageCount}
-              </option>
-            ))}
-          </select>
+            {Math.round(scale * 100)}%
+          </button>
 
           <button
             type="button"
             className="icon-button"
-            onClick={() => onSelectPage(pageIndex + 1)}
-            disabled={pageIndex >= pageCount - 1}
-            aria-label="Next sheet"
-            title="Next sheet"
+            onClick={onZoomIn}
+            aria-label="Zoom in"
+            title="Zoom in"
           >
-            <span aria-hidden="true">&#8250;</span>
+            <Icon name="zoomIn" />
+          </button>
+
+          <button
+            type="button"
+            className="icon-button"
+            onClick={onRotate}
+            aria-label="Rotate 90 degrees"
+            title="Rotate 90°"
+          >
+            <Icon name="rotate" />
           </button>
         </div>
-      )}
 
-      <div className="topbar-spacer" />
+        {onExport && (
+          <div className="topbar-exports">
+            <button
+              type="button"
+              className="btn export-working"
+              onClick={onExport}
+              disabled={isExporting}
+              title="Markups stay selectable and repliable in Acrobat's Comments panel. Nothing is locked."
+            >
+              <Icon name="download" size={18} />
+              <span className="btn-label">{isExporting ? 'Exporting…' : 'Working copy'}</span>
+            </button>
 
-      <div className="topbar-group">
-        <button
-          type="button"
-          className="icon-button"
-          onClick={onZoomOut}
-          aria-label="Zoom out"
-          title="Zoom out"
-        >
-          <Icon name="zoomOut" />
-        </button>
-
-        <button
-          type="button"
-          className="icon-button readout mono"
-          onClick={onResetZoom}
-          title="Reset zoom to 100%"
-        >
-          {Math.round(scale * 100)}%
-        </button>
-
-        <button
-          type="button"
-          className="icon-button"
-          onClick={onZoomIn}
-          aria-label="Zoom in"
-          title="Zoom in"
-        >
-          <Icon name="zoomIn" />
-        </button>
-
-        <button
-          type="button"
-          className="icon-button"
-          onClick={onRotate}
-          aria-label="Rotate 90 degrees"
-          title="Rotate 90°"
-        >
-          <Icon name="rotate" />
-        </button>
+            <button
+              type="button"
+              className="btn primary"
+              onClick={onExportFlat}
+              disabled={isExporting}
+              title="Paints every markup into the drawing. Guaranteed to appear in any viewer — and makes those markups permanent."
+            >
+              <Icon name="lock" size={18} />
+              <span className="btn-label">{isExporting ? 'Exporting…' : 'Issue PDF'}</span>
+            </button>
+          </div>
+        )}
       </div>
-
-      {onExport && (
-        <>
-          <button
-            type="button"
-            className="btn"
-            onClick={onExport}
-            disabled={isExporting}
-            title="Markups stay selectable and repliable in Acrobat's Comments panel. Nothing is locked."
-          >
-            <Icon name="download" size={18} />
-            {isExporting ? 'Exporting…' : 'Working copy'}
-          </button>
-
-          <button
-            type="button"
-            className="btn primary"
-            onClick={onExportFlat}
-            disabled={isExporting}
-            title="Paints every markup into the drawing. Guaranteed to appear in any viewer — and makes those markups permanent."
-          >
-            <Icon name="lock" size={18} />
-            {isExporting ? 'Exporting…' : 'Issue PDF'}
-          </button>
-        </>
-      )}
     </header>
   );
 }

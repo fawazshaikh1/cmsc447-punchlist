@@ -64,9 +64,29 @@ export function ToolPalette({
   sourceCount = 0,
   showSource,
   onToggleSource,
+  panelOpen,
+  onTogglePanel,
 }) {
   return (
     <nav className="tool-rail" aria-label="Markup tools">
+      {/* First in the rail rather than in the top bar: at tablet width the top
+          bar runs off the screen, and this is the control that has to be
+          reachable exactly when the panel is covering the drawing. No active
+          fill when open — that is the panel's normal state, and an accent here
+          would read as a second selected tool. */}
+      <button
+        type="button"
+        className="tool"
+        onClick={onTogglePanel}
+        aria-pressed={panelOpen}
+        title={panelOpen ? 'Hide the side panel' : 'Show the side panel'}
+      >
+        <Icon name="panel" size={22} />
+        <span className="tool-label">Panel</span>
+      </button>
+
+      <div className="rail-divider" />
+
       {/* Titles name the specific step, so hovering tells you what you are
           about to reverse rather than just "undo". */}
       <button

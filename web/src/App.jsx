@@ -51,6 +51,12 @@ export default function App() {
   // useExport never sees because the export has not started yet.
   const [exportPrecheckError, setExportPrecheckError] = useState(null);
 
+  // Whether the side panel is showing. Lives here rather than in SheetViewer
+  // because the `.app-body` grid needs it too, to give the stage the panel's
+  // column back. Hiding it matters most at tablet width, where the panel slides
+  // over the drawing instead of sitting beside it.
+  const [panelOpen, setPanelOpen] = useState(true);
+
   // Discard undo history when a different drawing is opened. Commands hold
   // references to the previous document's annotations, and undoing one after
   // switching would write a stale annotation into the new document's storage.
@@ -187,13 +193,15 @@ export default function App() {
       )}
 
       {page && sheetId ? (
-        <div className="app-body">
+        <div className={panelOpen ? 'app-body' : 'app-body no-panel'}>
           <SheetViewer
             sheetId={sheetId}
             documentName={fileName}
             page={page}
             scale={scale}
             rotation={rotation}
+            panelOpen={panelOpen}
+            onPanelOpenChange={setPanelOpen}
           />
         </div>
       ) : (
