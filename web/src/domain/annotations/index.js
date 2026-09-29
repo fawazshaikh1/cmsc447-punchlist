@@ -33,3 +33,4 @@ export { CloudMarkup, CLOUD_KIND } from './CloudMarkup';
 export { ArrowMarkup, ARROW_KIND } from './ArrowMarkup';
 export { InkMarkup, INK_KIND } from './InkMarkup';
 export { TextMarkup, TEXT_KIND } from './TextMarkup';
+export { PhotoMarkup, PHOTO_KIND } from './PhotoMarkup';

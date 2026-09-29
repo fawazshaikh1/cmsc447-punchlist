@@ -9,7 +9,7 @@ const STORAGE_PREFIX = 'punchlist.annotations.';
  * ---------------------------------------------------------------------------
  * WHY THIS EXISTS RATHER THAN JUST USING THE IN-MEMORY ONE
  * ---------------------------------------------------------------------------
- * SCRUM-19 requires demonstrating that a pin's coordinate SURVIVES. Surviving a
+ * The product has to demonstrate that a pin's coordinate SURVIVES. Surviving a
  * zoom is proven by the SVG overlay; surviving a page reload needs real
  * persistence. With this wired in, the acceptance criterion is demonstrable to
  * a stakeholder in ten seconds — drop pins, press F5, they are still there —

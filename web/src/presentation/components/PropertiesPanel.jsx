@@ -1,6 +1,19 @@
 import { PinStatus } from '../../domain/annotations';
+import { useMediaUrl } from '../media/useMediaUrl';
+import { Icon } from './Icon';
 import { useConfirmation } from './ConfirmDialog';
+import { useCommitOnBlur } from './useCommitOnBlur';
 import { ClosingNotice, SealedNotice } from './SealingNotice';
+
+/**
+ * How much one press of the size buttons changes a markup.
+ *
+ * 1.2 is a fifth larger, which is visible at a glance but small enough that
+ * holding the button gives fine control. Growing and shrinking use the factor
+ * and its reciprocal, so a press each way returns to exactly where it started —
+ * with anything else, nudging back and forth would drift.
+ */
+const STEP = 1.2;
 
 const STATUS_LABELS = {
   [PinStatus.OPEN]: 'Open',
@@ -50,6 +63,8 @@ const STATUS_LABELS = {
  * @param {import('../../domain/policy').EditDecision} [props.lock]
  * @param {import('../../domain/rules').RuleViolation[]} [props.problems]
  * @param {import('../../domain/audit/ChangeRecord').ChangeRecord|null} [props.lastChange]
+ * @param {((annotation, factor: number) => void)|undefined} [props.onResize]
+ *        Omitted when this annotation has no size to change.
  */
 export function PropertiesPanel({
   annotation,
@@ -59,8 +74,41 @@ export function PropertiesPanel({
   lock = { allowed: true, denied: false, reason: '' },
   problems = [],
   lastChange = null,
+  onResize,
 }) {
   const { ask, dialog } = useConfirmation();
+
+  // =========================================================================
+  // EVERY HOOK RUNS BEFORE THE EARLY RETURN
+  // =========================================================================
+  // React requires the same hooks in the same order on every render, so these
+  // cannot sit inside the capability branches below. They are therefore written
+  // to tolerate a null annotation, and each one is simply never used when its
+  // capability is absent.
+  const id = annotation?.id;
+
+  const descriptionField = useCommitOnBlur(
+    annotation?.label ?? '',
+    (next) => onUpdate(annotation, annotation.withLabel(next), 'Describe'),
+    id,
+  );
+
+  const captionField = useCommitOnBlur(
+    annotation?.caption ?? '',
+    (next) => onUpdate(annotation, annotation.withCaption(next), 'Caption'),
+    id,
+  );
+
+  const textField = useCommitOnBlur(
+    annotation?.text ?? '',
+    (next) => {
+      // A callout with no text is not a callout, and TextMarkup's constructor
+      // refuses an empty string. Discarding the edit is the only safe answer.
+      const trimmed = next.trim();
+      if (trimmed) onUpdate(annotation, annotation.withText(trimmed), 'Edit');
+    },
+    id,
+  );
 
   if (!annotation) return null;
 
@@ -68,6 +116,9 @@ export function PropertiesPanel({
   const canLabel = typeof annotation.withLabel === 'function';
   const canStatus = typeof annotation.withStatus === 'function';
   const canText = typeof annotation.withText === 'function';
+  // A seventh capability, and the panel needed no restructuring to gain it —
+  // implementing `withCaption` is the whole cost of appearing here.
+  const canCaption = typeof annotation.withCaption === 'function';
 
   /** The problem attached to one input, if any. Drives the inline message. */
   const problemFor = (field) => problems.find((violation) => violation.field === field);
@@ -139,17 +190,31 @@ export function PropertiesPanel({
             key={`${annotation.id}:${annotation.label}`}
             readOnly={readOnly}
             aria-invalid={descriptionProblem ? 'true' : undefined}
-            onBlur={(event) => {
-              const next = event.target.value;
-              if (next !== annotation.label) {
-                onUpdate(annotation, annotation.withLabel(next), 'Describe');
-              }
-            }}
+            onChange={descriptionField.onChange}
+            onBlur={descriptionField.onBlur}
           />
           {descriptionProblem && (
             <span className="field-error">{descriptionProblem.message}</span>
           )}
         </label>
+      )}
+
+      {canCaption && (
+        <>
+          <PhotoPreview media={annotation.media} caption={annotation.caption} />
+          <label className="field">
+            Caption
+            <textarea
+              rows={2}
+              placeholder={readOnly ? '' : 'What does this photo show?'}
+              defaultValue={annotation.caption}
+              key={`${annotation.id}:${annotation.caption}`}
+              readOnly={readOnly}
+              onChange={captionField.onChange}
+              onBlur={captionField.onBlur}
+            />
+          </label>
+        </>
       )}
 
       {canText && (
@@ -160,12 +225,8 @@ export function PropertiesPanel({
             defaultValue={annotation.text}
             key={`${annotation.id}:${annotation.text}`}
             readOnly={readOnly}
-            onBlur={(event) => {
-              const next = event.target.value.trim();
-              if (next && next !== annotation.text) {
-                onUpdate(annotation, annotation.withText(next), 'Edit');
-              }
-            }}
+            onChange={textField.onChange}
+            onBlur={textField.onBlur}
           />
         </label>
       )}
@@ -187,6 +248,38 @@ export function PropertiesPanel({
         </label>
       )}
 
+      {/* Offered by CAPABILITY, like every other control here: `onResize` is
+          passed only when the annotation implements `scaledBy`. A pin has no
+          size, so no control appears and nothing had to know that. */}
+      {onResize && (
+        <div className="field">
+          Size
+          <div className="size-control">
+            <button
+              type="button"
+              className="size-step"
+              disabled={readOnly}
+              onClick={() => onResize(annotation, 1 / STEP)}
+              aria-label="Make smaller"
+              title="Make smaller"
+            >
+              &#8722;
+            </button>
+            <span className="size-readout mono">{describeSize(annotation)}</span>
+            <button
+              type="button"
+              className="size-step"
+              disabled={readOnly}
+              onClick={() => onResize(annotation, STEP)}
+              aria-label="Make bigger"
+              title="Make bigger"
+            >
+              +
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* D14: last updated and by whom, without opening anything. Reads "this
           device edited it, 18/09/2026, 11:22" until sign-in exists, then names
           a person — with no change to this markup. */}
@@ -202,7 +295,9 @@ export function PropertiesPanel({
       <p className="muted small">
         {readOnly
           ? 'Add a new markup on top if something here still needs work.'
-          : 'Drag with the Select tool to reposition. Every change here is undoable.'}
+          : onResize
+            ? 'Drag with the Select tool to reposition, or use the size buttons. Every change here is undoable.'
+            : 'Drag with the Select tool to reposition. Every change here is undoable.'}
       </p>
 
       <button
@@ -215,4 +310,63 @@ export function PropertiesPanel({
       </button>
     </aside>
   );
+}
+
+/**
+ * The selected photograph, at panel width.
+ *
+ * Separate from the panel because it needs a hook, and a hook cannot be called
+ * conditionally — inlining `useMediaUrl` inside the `canCaption` branch would
+ * change the hook order between a pin and a photo and break React's rules.
+ * Extracting it means the hook always runs, exactly once, in its own component.
+ */
+function PhotoPreview({ media, caption }) {
+  const { url, loading } = useMediaUrl(media?.key);
+
+  if (!media) return null;
+
+  return (
+    <div className="photo-thumb">
+      {url ? (
+        <img src={url} alt={caption || 'Photo attached to this markup'} />
+      ) : (
+        <div className="photo-thumb-empty">
+          {loading ? (
+            <span className="muted small">Loading photo…</span>
+          ) : (
+            <>
+              <Icon name="alert" size={20} />
+              <span className="muted small">
+                Not on this device. It will export as a marked placeholder.
+              </span>
+            </>
+          )}
+        </div>
+      )}
+      <p className="muted small">
+        {media.width}&#215;{media.height}
+        {media.byteSize > 0 && ` · ${Math.round(media.byteSize / 1024)} KB`}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The size to show beside the buttons, in the unit that markup is measured in.
+ *
+ * A photo is a width on the sheet, a callout is a type size, a box is a
+ * diagonal. Reading `widthPts` off everything would be wrong for two of the
+ * three, so each is asked for what it actually has — still without naming a
+ * type, by checking which property is there.
+ */
+function describeSize(annotation) {
+  if (typeof annotation.widthPts === 'number') return `${Math.round(annotation.widthPts)} pt wide`;
+  if (typeof annotation.fontSize === 'number') return `${Math.round(annotation.fontSize)} pt type`;
+
+  if (typeof annotation.getBounds === 'function') {
+    const { width, height } = annotation.getBounds();
+    return `${Math.round(width)} × ${Math.round(height)} pt`;
+  }
+
+  return 'scalable';
 }

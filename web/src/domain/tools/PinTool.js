@@ -2,7 +2,7 @@ import { Pin, PinStatus } from '../annotations/Pin';
 import { AnnotationTool } from './AnnotationTool';
 
 /**
- * Places a punch-item pin with a single tap. The SCRUM-19 interaction.
+ * Places a punch-item pin with a single tap.
  *
  * `isInstant()` is true, which matters more on a tablet than it looks: a real
  * finger tap always carries a pixel or two of movement, so treating it as a

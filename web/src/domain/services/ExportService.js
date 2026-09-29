@@ -96,7 +96,7 @@ export class ExportService {
    *        its seals again.
    * @param {(done: number, total: number) => void} [request.onProgress]
    *        A 153-page set takes long enough that silence reads as a hang.
-   * @returns {Promise<{ bytes: Uint8Array, annotatedPages: number, annotationCount: number, sealed: import('../export/ExportRecord').ExportRecord|null }>}
+   * @returns {Promise<{ bytes: Uint8Array, annotatedPages: number, annotationCount: number, flattenedCount: number, flattenedPages: number, sealed: import('../export/ExportRecord').ExportRecord|null }>}
    */
   async exportDocument({
     sourceBytes,
@@ -130,11 +130,23 @@ export class ExportService {
       onProgress?.(pageIndex + 1, pageCount);
     }
 
-    const bytes = await this.exporter.exportAnnotated({
+    const produced = await this.exporter.exportAnnotated({
       sourceBytes,
       pages,
       author: attributedTo,
+      // Passed through so an exporter can put the drawing set's name on
+      // anything it generates. Optional in the contract, and ignored by the
+      // native exporter, which adds no pages of its own.
+      documentName,
     });
+
+    // Either shape is valid — see SheetExporter. `flattenedCount` counts what
+    // was burned into the page, which INCLUDES markups that were already in the
+    // file and are therefore not in `annotationCount`.
+    const reported = produced instanceof Uint8Array ? null : produced;
+    const bytes = reported ? reported.bytes : produced;
+    const flattenedCount = reported?.flattenedCount ?? 0;
+    const flattenedPages = reported?.flattenedPages ?? 0;
 
     // ORDER MATTERS: the PDF is produced first, and only a successful export is
     // recorded. Sealing markups for a file that failed to build would lock work
@@ -146,7 +158,14 @@ export class ExportService {
       annotationCount,
     });
 
-    return { bytes, annotatedPages: pages.length, annotationCount, sealed };
+    return {
+      bytes,
+      annotatedPages: pages.length,
+      annotationCount,
+      flattenedCount,
+      flattenedPages,
+      sealed,
+    };
   }
 
   /**

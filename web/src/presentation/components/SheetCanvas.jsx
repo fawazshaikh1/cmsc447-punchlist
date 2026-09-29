@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Paints a single PDF page. **This is SCRUM-18's deliverable.**
+ * Paints a single PDF page.
  *
  * Intentionally the dumbest component in the application: it holds no state,
  * handles no clicks, and knows nothing about annotations. All it does is ask

@@ -30,7 +30,7 @@ export function useExport() {
         const sourceBytes = await sourceFile.arrayBuffer();
 
         const service = flatten ? exportsFlattened : exports;
-        const { bytes, annotatedPages, annotationCount, sealed } =
+        const { bytes, annotatedPages, annotationCount, flattenedCount, flattenedPages, sealed } =
           await service.exportDocument({
             sourceBytes,
             pageCount,
@@ -45,8 +45,27 @@ export function useExport() {
               }),
           });
 
-        if (annotationCount === 0) {
-          setStatus({ busy: false, message: 'Nothing to export — no markups yet.', error: null });
+        // ================================================================
+        // WHAT COUNTS AS "NOTHING TO EXPORT"
+        // ================================================================
+        // Our own markups are not the whole story for a flattened export.
+        // Re-open a drawing you exported earlier and every markup in it is now
+        // the FILE's annotation, not ours — so our count is zero while the
+        // sheet is visibly covered in marks. Refusing on that count alone told
+        // the user "no markups yet" about a drawing full of them, and left
+        // them no way to issue it.
+        //
+        // Flattening acts on whatever is in the file, so the honest test is
+        // whether anything was actually produced: ours to add, or the file's
+        // to burn in.
+        if (annotationCount === 0 && flattenedCount === 0) {
+          setStatus({
+            busy: false,
+            error: null,
+            message: flatten
+              ? 'Nothing to issue — this drawing has no markups on it.'
+              : 'Nothing to export — no markups yet.',
+          });
           return;
         }
 
@@ -78,9 +97,16 @@ export function useExport() {
         setStatus({
           busy: false,
           error: null,
-          message:
-            `Exported ${annotationCount} markup(s) across ${annotatedPages} sheet(s).` +
-            (sealed ? ' They are now issued and read-only.' : ''),
+          // Reports what actually happened rather than what we contributed.
+          // A re-issued drawing flattens markups we never made, so saying
+          // "exported 0 markups" about a file full of them would be wrong —
+          // and `annotatedPages` counts only sheets WE added to, which is 0 in
+          // that case. Both numbers come from the exporter for the flattened
+          // message, so neither is a guess.
+          message: flatten
+            ? `Issued ${flattenedCount} markup(s) across ${flattenedPages} sheet(s).` +
+              (sealed ? ' Yours are now read-only.' : '')
+            : `Exported ${annotationCount} markup(s) across ${annotatedPages} sheet(s).`,
         });
       } catch (error) {
         setStatus({

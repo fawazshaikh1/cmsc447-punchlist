@@ -388,6 +388,172 @@ check('a comment will need no new storage — the intent already fits', async ()
   assert.equal(record.describe(), 'this device commented on it');
 });
 
+// =========================================================================
+// PART 3 — resizing
+// =========================================================================
+
+check('resize scales about the anchor, and is exactly reversible', async () => {
+  const { editor, repository } = build();
+  const original = pin('a', 'Cracked tile');
+
+  // A pin has no size, so it must not be resizable and resize must be a no-op
+  // rather than a throw — the interface asks before offering the control, and
+  // a caller that asks anyway should not crash.
+  assert.equal(editor.canResize(original), false);
+  await editor.add(original);
+  await editor.resize(original, 1.2);
+
+  const [unchanged] = await repository.listBySheet(SHEET);
+  assert.equal(unchanged.getAnchor().x, 100, 'a pin must not move when resized');
+});
+
+check('a photo scales its width and keeps its aspect ratio', async () => {
+  const { PhotoMarkup } = await import('../src/domain/annotations/PhotoMarkup.js');
+  const { MediaRef } = await import('../src/domain/media/MediaRef.js');
+
+  const photo = new PhotoMarkup(
+    'p1',
+    SHEET,
+    new PdfPoint(100, 400),
+    new MediaRef({ key: 'k', mimeType: 'image/jpeg', width: 1000, height: 500 }),
+    '',
+    200,
+    new Date('2026-09-23'),
+  );
+
+  const bigger = photo.scaledBy(1.5);
+  assert.equal(bigger.widthPts, 300);
+  assert.equal(bigger.heightPts, 150, 'height follows the aspect ratio');
+
+  // The anchor does not move: a photo grows away from the corner the user
+  // tapped, so it keeps pointing at the defect.
+  assert.equal(bigger.getAnchor().x, 100);
+  assert.equal(bigger.getAnchor().y, 400);
+
+  // Shrinking by the reciprocal returns exactly, which is what makes the
+  // panel's minus button undo its plus button.
+  assert.equal(bigger.scaledBy(1 / 1.5).widthPts, 200);
+});
+
+check('a two-point shape scales about its start point', async () => {
+  const { RectangleMarkup } = await import('../src/domain/annotations/RectangleMarkup.js');
+  const { MarkupStyle } = await import('../src/domain/annotations/MarkupStyle.js');
+
+  const box = new RectangleMarkup(
+    'r1',
+    SHEET,
+    new PdfPoint(100, 100),
+    new PdfPoint(200, 150),
+    new MarkupStyle(),
+    new Date('2026-09-23'),
+  );
+
+  const bigger = box.scaledBy(2);
+  assert.equal(bigger.start.x, 100, 'the start point is the anchor and must not move');
+  assert.equal(bigger.start.y, 100);
+  assert.equal(bigger.end.x, 300);
+  assert.equal(bigger.end.y, 200);
+
+  // Still a rectangle, not a TwoPointMarkup — `this.constructor` matters.
+  assert.equal(bigger.getKind(), box.getKind());
+});
+
+check('resizing goes through the policy and is recorded', async () => {
+  const { PhotoMarkup } = await import('../src/domain/annotations/PhotoMarkup.js');
+  const { MediaRef } = await import('../src/domain/media/MediaRef.js');
+  const { editor, changeLog, repository } = build();
+
+  const photo = new PhotoMarkup(
+    'p1',
+    SHEET,
+    new PdfPoint(100, 400),
+    new MediaRef({ key: 'k', mimeType: 'image/jpeg', width: 800, height: 600 }),
+    '',
+    150,
+    new Date('2026-09-23'),
+  );
+
+  await editor.add(photo);
+  await editor.resize(photo, 1.2);
+
+  const [stored] = await repository.listBySheet(SHEET);
+  assert.ok(Math.abs(stored.widthPts - 180) < 0.001);
+
+  const history = await changeLog.listForAnnotation(SHEET, 'p1');
+  assert.equal(history[0].intent, 'resize', 'a resize is its own intent, so a role can allow it separately');
+  assert.equal(history[0].detail, 'Resize');
+});
+
+// =========================================================================
+// PART 4 — cloud geometry
+// =========================================================================
+
+check('cloud bumps join end to end, all the way round', async () => {
+  // ======================================================================
+  // THE REGRESSION THIS EXISTS FOR
+  // ======================================================================
+  // `from` and `to` were once swapped, on the strength of a hand calculation
+  // that used the wrong outward normal. Every arc then ran backwards along its
+  // own chord, so bump i ended where bump i-1 started.
+  //
+  // It was invisible on screen, because the SVG renderer just continues the
+  // path and the absolute Bezier control points still described bump-shaped
+  // curves. The PDF writer emits an explicit lineto between arcs, so THERE it
+  // came out as teardrops with straight lines slashing the corners — a fault
+  // only visible after exporting and opening the file.
+  //
+  // This asserts the property directly, in the geometry, where neither renderer
+  // can hide it.
+  const { scallopArcs } = await import('../src/domain/annotations/geometry/scallops.js');
+
+  const arcs = scallopArcs({ x: 100, y: 100, width: 240, height: 130 }, 14);
+  assert.ok(arcs.length > 8, 'a shape this size should produce plenty of bumps');
+
+  const endOf = (a) => ({ x: a.cx + a.r * Math.cos(a.to), y: a.cy + a.r * Math.sin(a.to) });
+  const startOf = (a) => ({ x: a.cx + a.r * Math.cos(a.from), y: a.cy + a.r * Math.sin(a.from) });
+
+  for (let i = 1; i < arcs.length; i++) {
+    const previous = endOf(arcs[i - 1]);
+    const current = startOf(arcs[i]);
+    const gap = Math.hypot(current.x - previous.x, current.y - previous.y);
+
+    assert.ok(
+      gap < 0.001,
+      `bump ${i} starts ${gap.toFixed(2)}pt from where bump ${i - 1} ended — ` +
+        'the arcs are running backwards along their edges',
+    );
+  }
+
+  // And the outline closes: the last bump ends where the first one began.
+  const first = startOf(arcs[0]);
+  const last = endOf(arcs[arcs.length - 1]);
+  assert.ok(Math.hypot(last.x - first.x, last.y - first.y) < 0.001, 'the outline must close');
+});
+
+check('every bump bulges outward, never into the shape', async () => {
+  const { scallopArcs } = await import('../src/domain/annotations/geometry/scallops.js');
+
+  const bounds = { x: 100, y: 100, width: 240, height: 130 };
+  const centreX = bounds.x + bounds.width / 2;
+  const centreY = bounds.y + bounds.height / 2;
+
+  for (const arc of scallopArcs(bounds, 14)) {
+    // The furthest point of the arc from the shape's centre is its apex. If the
+    // sweep or the centre offset had the wrong sign the apex would fall INSIDE
+    // the rectangle, and the cloud would read as a row of bites taken out of it.
+    const mid = (arc.from + arc.to) / 2;
+    const apex = { x: arc.cx + arc.r * Math.cos(mid), y: arc.cy + arc.r * Math.sin(mid) };
+
+    const apexDistance = Math.hypot(apex.x - centreX, apex.y - centreY);
+    const chordDistance = Math.hypot(arc.cx - centreX, arc.cy - centreY);
+
+    assert.ok(
+      apexDistance > chordDistance,
+      'a bump apex must sit further from the centre than its own chord',
+    );
+  }
+});
+
 // --- run --------------------------------------------------------------------
 
 let failed = 0;

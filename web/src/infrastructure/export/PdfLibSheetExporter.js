@@ -1,6 +1,7 @@
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 
 import { SheetExporter } from '../../domain/ports/SheetExporter';
+import { assignOrdinals } from '../../domain/punchlist';
 import { PdfWriterRegistry } from './PdfWriterRegistry';
 import { ensureDefaultFontResource } from './pdfPrimitives';
 
@@ -38,6 +39,19 @@ import './writers';
  */
 export class PdfLibSheetExporter extends SheetExporter {
   /**
+   * @param {object} [options]
+   * @param {import('../../domain/ports/MediaStore').MediaStore} [options.media]
+   *        Where photo bytes are read from during export. Optional so an
+   *        exporter with no photos to embed needs no wiring — a drawing marked
+   *        up with boxes and clouds exports identically without it.
+   */
+  constructor({ media = null } = {}) {
+    super();
+    this.media = media;
+  }
+
+
+  /**
    * @param {import('../../domain/ports/SheetExporter').ExportRequest} request
    * @returns {Promise<Uint8Array>}
    */
@@ -63,6 +77,12 @@ export class PdfLibSheetExporter extends SheetExporter {
 
     const pageCount = pdfDoc.getPageCount();
 
+    // Numbered the same way the flattened export numbers, so a pin is item 7 in
+    // both files. A working copy and the issued PDF that follows it have to
+    // agree about which item is which, or a comment on one cannot be matched to
+    // a mark on the other.
+    const ordinals = assignOrdinals(pages);
+
     for (const { pageIndex, annotations } of pages) {
       // Defensive: a stale sheet id could reference a page that no longer
       // exists if the drawing set was re-issued with fewer sheets. Skipping is
@@ -75,7 +95,18 @@ export class PdfLibSheetExporter extends SheetExporter {
 
       const page = pdfDoc.getPage(pageIndex);
 
-      annotations.forEach((annotation, index) => {
+      // A sequential `for` rather than `forEach`, because one writer is async:
+      // the photo writer reads bytes and embeds an image. `forEach` cannot await,
+      // so the annotations would be scheduled and the document saved before any
+      // of them had finished — an export with every photo missing.
+      //
+      // Sequential rather than Promise.all on purpose: pdf-lib's document is
+      // mutable shared state, and appending to /Annots from several concurrent
+      // writers is not something it promises to survive. Photos are few per
+      // sheet, so the lost parallelism is not worth the risk.
+      for (let index = 0; index < annotations.length; index++) {
+        const annotation = annotations[index];
+
         // `index` is the annotation's position within this page, which the pin
         // writer turns into the visible number. Passing it in the context — as
         // opposed to storing it on the annotation — keeps numbering a
@@ -85,8 +116,23 @@ export class PdfLibSheetExporter extends SheetExporter {
         // Throws on an unregistered kind rather than skipping. Silently
         // dropping a markup from a file about to be sent to a client is data
         // loss, and the user would not find out until the client asked.
-        PdfWriterRegistry.write(annotation, { pdfDoc, page, author, font, index });
-      });
+        await PdfWriterRegistry.write(annotation, {
+          pdfDoc,
+          page,
+          author,
+          font,
+          index,
+          // The number this markup carries among others of ITS OWN kind, across
+          // the whole document. A pin numbered by its position in the sheet's
+          // annotation list was numbered by how many boxes happened to be drawn
+          // first — see assignOrdinals.
+          ordinal: ordinals.get(annotation),
+          // How a writer reaches image bytes. A function rather than the
+          // store itself, so a writer cannot delete or overwrite media
+          // while exporting — it can only read.
+          loadMedia: (key) => this.media?.get(key) ?? Promise.resolve(null),
+        });
+      }
     }
 
     return pdfDoc.save();

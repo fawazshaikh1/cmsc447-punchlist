@@ -14,3 +14,4 @@ export { CloudMarker } from './CloudMarker';
 export { ArrowMarker } from './ArrowMarker';
 export { InkMarker } from './InkMarker';
 export { TextMarker } from './TextMarker';
+export { PhotoMarker } from './PhotoMarker';

@@ -82,6 +82,34 @@ export class InkMarkup extends Annotation {
    * Translates every point in the stroke.
    * @param {number} dxPts @param {number} dyPts @returns {InkMarkup}
    */
+  /**
+   * A copy scaled about its first point.
+   *
+   * Every sampled point moves, so the stroke keeps its shape exactly — this is
+   * a similarity transform, not a re-draw. The first point is the anchor for
+   * the same reason the other types use their start: it is where the user put
+   * their finger down.
+   *
+   * @param {number} factor
+   */
+  scaledBy(factor) {
+    const origin = this.points[0];
+
+    return new InkMarkup(
+      this.id,
+      this.sheetId,
+      this.points.map(
+        (point) =>
+          new PdfPoint(
+            origin.x + (point.x - origin.x) * factor,
+            origin.y + (point.y - origin.y) * factor,
+          ),
+      ),
+      this.style,
+      this.createdAt,
+    );
+  }
+
   movedBy(dxPts, dyPts) {
     return new InkMarkup(
       this.id,

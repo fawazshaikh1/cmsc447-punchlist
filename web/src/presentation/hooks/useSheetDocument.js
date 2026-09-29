@@ -5,7 +5,7 @@ import { useServices } from '../ServiceContainer';
  * Owns the lifecycle of a loaded PDF: opening a file, selecting a page, and
  * tearing down the pdf.js worker when the document is replaced.
  *
- * This is the SCRUM-18 deliverable expressed as state. The actual painting
+ * Opening and paging a drawing, expressed as state. The actual painting
  * happens in SheetCanvas; this hook only produces the SheetPage that the canvas
  * and the annotation overlay both consume.
  */

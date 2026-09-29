@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 
 /**
- * Evidence panel for the SCRUM-19 spike.
+ * Evidence panel for coordinate anchoring.
  *
  * For each annotation it shows the STORED PDF point (which must never change),
  * the SCREEN position it currently maps to (which must change as you zoom), and
@@ -106,8 +106,8 @@ export function CoordinateInspector({
 
           <p className={allExact ? 'pass' : 'fail'}>
             {allExact
-              ? `SCRUM-19 acceptance: ${rows.length} pin(s), all round-trips exact.`
-              : 'SCRUM-19 FAILING: at least one round-trip lost precision.'}
+              ? `${rows.length} markup(s) anchored — every coordinate round-trips exactly.`
+              : 'A coordinate lost precision on round-trip. This should not happen.'}
           </p>
         </>
       )}

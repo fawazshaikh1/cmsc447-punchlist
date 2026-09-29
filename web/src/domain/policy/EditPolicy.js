@@ -47,6 +47,7 @@ export class EditPolicy {
   static INTENT = Object.freeze({
     CREATE: 'create',
     MOVE: 'move',
+    RESIZE: 'resize',
     UPDATE: 'update',
     DELETE: 'delete',
     STATUS: 'status',
