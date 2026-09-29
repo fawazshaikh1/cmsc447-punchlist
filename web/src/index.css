@@ -139,6 +139,10 @@ button:disabled {
 
 .app {
   display: grid;
+  /* One column that is allowed to be narrower than its content. Left implicit,
+     the column sizes itself to the top bar's min-content width, and on a tablet
+     the whole page — stage included — scrolls sideways. */
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   height: 100%;
   min-height: 0;
@@ -170,6 +174,35 @@ button:disabled {
   border-bottom: 1px solid var(--ink-650);
   position: relative;
   z-index: var(--z-chrome);
+}
+
+/* Which drawing, which sheet. Takes whatever width the actions leave, and
+   inside it the file name is the one thing that gives way. */
+.topbar-doc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* How it is being looked at, and how it leaves. Never squeezed — every control
+   in here stays whole and tappable — and held to the right edge whether it
+   shares the row or has one of its own. */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: none;
+  margin-left: auto;
+}
+
+/* Kept together so a wrapping bar never separates the two exports. */
+.topbar-exports {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .brand {
@@ -217,10 +250,6 @@ button:disabled {
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 26ch;
-}
-
-.topbar-spacer {
-  flex: 1;
 }
 
 .topbar-group {
@@ -309,6 +338,12 @@ button:disabled {
   font-weight: 500;
   white-space: nowrap;
   transition: background var(--dur) ease, border-color var(--dur) ease;
+}
+
+/* An icon never gives way when its row is tight — the text beside it does. */
+.btn > svg,
+.doc-chip > svg {
+  flex: none;
 }
 
 .btn:hover:not(:disabled) {
@@ -1108,18 +1143,56 @@ button:disabled {
   .brand-name {
     display: none;
   }
+
+  /* Once a drawing is open, "Open another" is the least-used control on the
+     bar, so it goes to its icon first. Before that it is the only thing to do,
+     and keeps its label. */
+  .has-document .file-button {
+    flex: none;
+    justify-content: center;
+    width: var(--tap);
+    padding: 0;
+  }
+
+  .has-document .file-button .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 1000px) {
+  /* Too narrow for one row: the view and export controls wrap under the
+     document ones rather than off the edge. In portrait, height is what there
+     is to spare, so a second row is the cheaper trade. */
+  .topbar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  /* On a row of their own the actions may wrap too, the exports under the
+     view controls, on anything narrower than the target devices. */
+  .topbar-actions {
+    flex-wrap: wrap;
+    flex-shrink: 1;
+  }
 }
 
 @media (max-width: 900px) {
   /* The panel becomes a sheet over the stage rather than a column — at this
-     width a third column leaves the drawing too narrow to work on. */
+     width a third column leaves the drawing too narrow to work on. It is
+     anchored to the body, not the viewport, so it never covers the top bar. */
   .app-body,
   .app-body.no-panel {
     grid-template-columns: 64px minmax(0, 1fr);
+    position: relative;
   }
 
   .panel {
-    position: fixed;
+    position: absolute;
     top: 0;
     right: 0;
     bottom: 0;
@@ -1129,10 +1202,6 @@ button:disabled {
 
   .panel:empty {
     display: none;
-  }
-
-  .doc-chip strong {
-    max-width: 14ch;
   }
 
   .tool-label {
@@ -1146,6 +1215,37 @@ button:disabled {
 
   .photo-choices {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  /* The safe, reversible export gives up its label; "Issue PDF" keeps its own,
+     so the irreversible one is still the unmistakable one. */
+  .export-working {
+    flex: none;
+    justify-content: center;
+    width: var(--tap);
+    padding: 0;
+  }
+
+  .export-working .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* The sheet picker stays beside the file name as long as it can, then
+     drops to a row of its own. */
+  .topbar-doc {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .doc-chip strong {
+    max-width: 10ch;
   }
 }
 
