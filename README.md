@@ -5,8 +5,3 @@ A web/tablet application for architectural and engineering punch list inspection
 Course: CMSC 447 — Software Engineering I, Fall 2026
 Team: Fawaz Shaikh, Joey, Saumya
 Stack: React + pdf.js · [backend] · PostgreSQL · AWS (S3, RDS)
-
-Team
-Name 1 — role
-Name 2 — role
-Name 3 — role
