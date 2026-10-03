@@ -8,6 +8,7 @@ import { useSourceAnnotations } from '../hooks/useSourceAnnotations';
 import { AnnotationLayer } from './AnnotationLayer';
 import { CoordinateInspector } from './CoordinateInspector';
 import { Icon } from './Icon';
+import { PanelReveal } from './PanelReveal';
 import { PropertiesPanel } from './PropertiesPanel';
 import { SheetCanvas } from './SheetCanvas';
 import { ToolPalette } from './ToolPalette';
@@ -196,7 +197,7 @@ export function SheetViewer({
             className="icon-button"
             onClick={() => onPanelOpenChange(false)}
             aria-label="Hide panel"
-            title="Hide panel — bring it back with Panel at the top of the tool rail"
+            title="Hide panel — bring it back with Details at the top right"
           >
             <Icon name="close" size={18} />
           </button>
@@ -246,6 +247,8 @@ export function SheetViewer({
           onClear={editor.clearSheet}
         />
       </aside>
+
+      {!panelOpen && <PanelReveal onShow={() => onPanelOpenChange(true)} />}
     </>
   );
 }
