@@ -23,6 +23,10 @@ import './domain/tools';
 // must carry a description. See domain/rules/index.js for why registration
 // lives in the barrel rather than in each rule's own file.
 import './domain/rules';
+// Registers the fields a punch item carries — trade, responsible company,
+// assignee, due date — before any pin is read from storage, so stored values
+// are cleaned on the way in. See domain/details/index.js.
+import './domain/details';
 import './presentation/components/markers';
 
 /**

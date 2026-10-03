@@ -226,6 +226,7 @@ export function SheetViewer({
             // Passed only when the markup HAS a size, so the panel offers the
             // control by capability rather than by checking a type.
             onResize={editor.canResize(editor.selected) ? editor.resize : undefined}
+            peers={editor.annotations}
           />
         ) : (
           <div className="panel-empty">
