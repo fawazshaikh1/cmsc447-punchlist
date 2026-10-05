@@ -10,11 +10,13 @@ import {
 import { AnnotationService } from '../domain/services/AnnotationService';
 import { EditorService } from '../domain/services/EditorService';
 import { ExportService } from '../domain/services/ExportService';
+import { WorkingCopyService } from '../domain/services/WorkingCopyService';
 import { PdfJsDocumentSource } from '../infrastructure/pdf/PdfJsDocumentSource';
 import { IndexedDbMediaStore } from '../infrastructure/media/IndexedDbMediaStore';
 import { CanvasImageProcessor } from '../infrastructure/media/CanvasImageProcessor';
 import { MediaUrlCache } from './media/MediaUrlCache';
 import { PdfLibSheetExporter, FlattenedSheetExporter } from '../infrastructure/export';
+import { PdfLibWorkingCopyReader } from '../infrastructure/workingcopy/PdfLibWorkingCopyReader';
 import { LocalStorageAnnotationRepository } from '../infrastructure/persistence/LocalStorageAnnotationRepository';
 import { LocalStorageChangeLogRepository } from '../infrastructure/persistence/LocalStorageChangeLogRepository';
 import { LocalStorageExportHistoryRepository } from '../infrastructure/persistence/LocalStorageExportHistoryRepository';
@@ -154,6 +156,12 @@ export function ServiceContainer({
         ids,
       }),
       documents: documentSource ?? new PdfJsDocumentSource(),
+      // Brings back the markups a working copy carries when it is reopened,
+      // so they are live and selectable rather than part of the page picture.
+      workingCopies: new WorkingCopyService(new PdfLibWorkingCopyReader(), repo, {
+        changeLog: log,
+        media,
+      }),
       identity: who,
       // Both read directly by the editor hook. Exposed because they are domain
       // ports — the presentation layer depending on them is the dependency rule
