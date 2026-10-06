@@ -1,5 +1,6 @@
 import { PinStatus } from '../../domain/annotations';
 import { useMediaUrl } from '../media/useMediaUrl';
+import { ItemDetailsEditor } from './details';
 import { Icon } from './Icon';
 import { useConfirmation } from './ConfirmDialog';
 import { useCommitOnBlur } from './useCommitOnBlur';
@@ -65,6 +66,9 @@ const STATUS_LABELS = {
  * @param {import('../../domain/audit/ChangeRecord').ChangeRecord|null} [props.lastChange]
  * @param {((annotation, factor: number) => void)|undefined} [props.onResize]
  *        Omitted when this annotation has no size to change.
+ * @param {import('../../domain/annotations').Annotation[]} [props.peers]
+ *        The other markups on the sheet, so detail fields can suggest values
+ *        already in use.
  */
 export function PropertiesPanel({
   annotation,
@@ -75,6 +79,7 @@ export function PropertiesPanel({
   problems = [],
   lastChange = null,
   onResize,
+  peers = [],
 }) {
   const { ask, dialog } = useConfirmation();
 
@@ -119,6 +124,10 @@ export function PropertiesPanel({
   // A seventh capability, and the panel needed no restructuring to gain it —
   // implementing `withCaption` is the whole cost of appearing here.
   const canCaption = typeof annotation.withCaption === 'function';
+  // The last capability this panel should ever need for item information: it
+  // brings EVERY registered detail field, so the next field is a file in
+  // domain/details/fields and never another branch here.
+  const canDetail = typeof annotation.withDetail === 'function';
 
   /** The problem attached to one input, if any. Drives the inline message. */
   const problemFor = (field) => problems.find((violation) => violation.field === field);
@@ -246,6 +255,15 @@ export function PropertiesPanel({
             ))}
           </select>
         </label>
+      )}
+
+      {canDetail && (
+        <ItemDetailsEditor
+          annotation={annotation}
+          readOnly={readOnly}
+          onUpdate={onUpdate}
+          peers={peers}
+        />
       )}
 
       {/* Offered by CAPABILITY, like every other control here: `onResize` is

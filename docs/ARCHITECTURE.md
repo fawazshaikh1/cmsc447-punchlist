@@ -103,9 +103,11 @@ registry rather than by a conditional in that consumer:
 | `PdfWriterRegistry` | how to write it into an exported PDF | infrastructure | **throws** — silently dropping a markup from an export is data loss |
 | `AnnotationRuleRegistry` | when it is complete enough to issue | domain | no rules — nothing to enforce |
 | `PunchListRegistry` | how it reads on the issued schedule | domain | skips — most markups are not action items |
+| `ItemFieldRegistry` | what else is recorded on a punch item (trade, company…) | domain | keeps the value — a field from a newer build is never deleted |
+| `FieldEditorRegistry` | which input edits each kind of field | presentation | shows the value read-only |
 
-Six sounds like a lot until you notice the alternative: a `switch` in each of
-those six consumers, so every new type risks breaking every existing one and
+Eight sounds like a lot until you notice the alternative: a `switch` in each of
+those consumers, so every new type risks breaking every existing one and
 guarantees merge conflicts on a team working in parallel.
 
 Note how the "unknown kind" column differs, and that the differences are not
@@ -120,6 +122,33 @@ with `data-incomplete`, both styled from CSS — rather than by passing
 `isSealed` / `isIncomplete` props that all six marker components would have to
 remember to honour. Adding the second cost one attribute rather than six
 component edits, which is that argument made concrete.
+
+## How to add a punch item field
+
+Trade, responsible company, assignee and due date are **item fields**. Each is
+one class in `domain/details/fields/`, registered in `domain/details/index.js`
+in the order the panel shows them. To add another — priority, room, cost:
+
+1. `domain/details/fields/YourField.js` — extend `TextItemField` or
+   `DateItemField` (or `ItemField` for a new kind of input) and give it a
+   `getKey()` and `getLabel()`. The key is a storage column in all but name:
+   never rename it once data exists.
+2. One `ItemFieldRegistry.register(new YourField())` line in the barrel.
+3. Only for a NEW input kind: an editor in
+   `presentation/components/details/` and one `FieldEditorRegistry.register`
+   line in that folder's barrel.
+
+`Pin`, the properties panel, storage, undo and the change log all pick it up.
+Values live in the pin's `payload.details` as a flat object of strings — a
+JSONB column on the server, no migration. A due date is stored as `YYYY-MM-DD`
+and handled as a `CalendarDate`, never a `Date`, so it cannot shift a day in a
+time zone west of UTC.
+
+*Honest note:* the first four fields needed a one-time extension point — `Pin`
+gained a `details` value carried through its copy methods, and the panel gained
+one `withDetail` capability check. Every field after them is the two steps
+above. `npm run verify:details` proves it by registering a field the suite
+invents and storing it with no other change.
 
 ## How to add a markup type
 

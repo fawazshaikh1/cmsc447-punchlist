@@ -1,3 +1,4 @@
+import { ItemDetails } from '../details/ItemDetails';
 import { PdfPoint } from '../geometry/PdfPoint';
 import { assertInstanceOf, COORDINATE_SPACE_HINT } from '../support/contracts';
 import { Annotation } from './Annotation';
@@ -43,6 +44,20 @@ export function isPinStatus(value) {
  *   2. When offline sync arrives in Sprint 3, a change becomes a VALUE we can
  *      queue, replay and diff against the server's version. Mutable objects
  *      make that materially harder.
+ *
+ * ---------------------------------------------------------------------------
+ * DETAILS — TRADE, COMPANY, ASSIGNEE, DUE DATE, AND WHATEVER COMES NEXT
+ * ---------------------------------------------------------------------------
+ * Everything recorded about the item beyond its description and status lives
+ * in one `ItemDetails` value, whose fields are registered in `domain/details`.
+ * Pin never names a field: it carries `details` through every copy and stores
+ * it under `payload.details`, and that is all.
+ *
+ * HONEST NOTE ON THE ARCHITECTURE: adding `details` meant editing this class
+ * once — the constructor, the three copy methods, and serialization. That was
+ * the price of an extension point Pin did not have. It is paid once: every
+ * field after the first four is a new file in `domain/details/fields` and one
+ * registration line, with no change here.
  */
 export class Pin extends Annotation {
   /**
@@ -52,8 +67,11 @@ export class Pin extends Annotation {
    * @param {string} label
    * @param {string} status One of PinStatus.
    * @param {Date} createdAt
+   * @param {ItemDetails} [details] Trade, company, due date and so on. Optional
+   *        so a new pin — and every caller written before details existed —
+   *        starts with none.
    */
-  constructor(id, sheetId, position, label, status, createdAt) {
+  constructor(id, sheetId, position, label, status, createdAt, details = ItemDetails.EMPTY) {
     super(id, sheetId, createdAt);
 
     // The guard that makes the coordinate-space rule real at runtime. Passing a
@@ -68,9 +86,12 @@ export class Pin extends Annotation {
       );
     }
 
+    assertInstanceOf(details, ItemDetails, 'Pin details');
+
     this.position = position;
     this.label = typeof label === 'string' ? label : '';
     this.status = status;
+    this.details = details;
     Object.freeze(this);
   }
 
@@ -84,19 +105,56 @@ export class Pin extends Annotation {
     return this.position;
   }
 
-  /** @returns {Record<string, unknown>} */
+  /**
+   * `details` is left out entirely when there are none, so a pin nobody has
+   * assigned stores byte-for-byte what it stored before details existed — and
+   * an older build reading it sees nothing new.
+   *
+   * @returns {Record<string, unknown>}
+   */
   serializePayload() {
-    return { label: this.label, status: this.status };
+    const payload = { label: this.label, status: this.status };
+    if (!this.details.isEmpty()) payload.details = this.details.toJSON();
+    return payload;
   }
 
   /** Returns a copy with a new status. The original is untouched. */
   withStatus(status) {
-    return new Pin(this.id, this.sheetId, this.position, this.label, status, this.createdAt);
+    return new Pin(
+      this.id, this.sheetId, this.position, this.label, status, this.createdAt, this.details,
+    );
   }
 
   /** Returns a copy with a new label. The original is untouched. */
   withLabel(label) {
-    return new Pin(this.id, this.sheetId, this.position, label, this.status, this.createdAt);
+    return new Pin(
+      this.id, this.sheetId, this.position, label, this.status, this.createdAt, this.details,
+    );
+  }
+
+  /**
+   * Returns a copy with one detail changed — `withDetail('trade', 'Drywall')`.
+   *
+   * Returns THIS pin, not a copy, when the cleaned value is what is already
+   * stored. The panel relies on that to tell an edit from someone tabbing
+   * through a field, so it records no undo step and no history for nothing.
+   *
+   * The capability the properties panel looks for: any annotation type that
+   * implements `withDetail` and carries `details` gets the registered fields,
+   * with no change to the panel.
+   *
+   * @param {string} key A key registered with ItemFieldRegistry.
+   * @param {unknown} value As entered. Cleaned by the field; rejected with a
+   *        RangeError if the field says it is invalid.
+   * @returns {Pin}
+   */
+  withDetail(key, value) {
+    const details = this.details.with(key, value);
+    if (details === this.details) return this;
+
+    return new Pin(
+      this.id, this.sheetId, this.position, this.label, this.status, this.createdAt, details,
+    );
   }
 
   /**
@@ -111,7 +169,9 @@ export class Pin extends Annotation {
    * @returns {Pin}
    */
   movedTo(position) {
-    return new Pin(this.id, this.sheetId, position, this.label, this.status, this.createdAt);
+    return new Pin(
+      this.id, this.sheetId, position, this.label, this.status, this.createdAt, this.details,
+    );
   }
 
   /** @param {number} dxPts @param {number} dyPts @returns {Pin} */
@@ -139,6 +199,8 @@ export class Pin extends Annotation {
       typeof payload.label === 'string' ? payload.label : '',
       isPinStatus(payload.status) ? payload.status : PinStatus.OPEN,
       new Date(dto.createdAt),
+      // Absent on every pin saved before details existed, which reads as none.
+      ItemDetails.fromJSON(payload.details),
     );
   }
 }

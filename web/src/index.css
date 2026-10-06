@@ -717,6 +717,60 @@ button:disabled {
   color: #e6b53d;
 }
 
+/* Punch item details — trade, company, assignee, due date. A group of its own
+   so the who-and-when reads as one block below the description and status. */
+.details {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ink-650);
+}
+
+.details-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-300);
+}
+
+/* An input with a small action beside it, e.g. a date and its Clear button. */
+.field-inline {
+  display: flex;
+  gap: 8px;
+}
+
+.field-inline input {
+  flex: 1;
+  min-width: 0;
+}
+
+.field-clear {
+  flex: none;
+  min-width: var(--tap);
+  padding: 0 12px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-200);
+  font: inherit;
+  font-size: 13px;
+}
+
+.field-clear:hover {
+  background: var(--ink-600);
+  color: var(--white);
+}
+
+/* A value shown without an editor — see ReadOnlyFieldEditor. */
+.field-value {
+  font-size: 15px;
+  font-weight: 400;
+  color: var(--ink-100);
+}
+
 .attribution {
   padding-top: 12px;
   border-top: 1px solid var(--ink-650);
