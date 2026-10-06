@@ -7,14 +7,15 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "verify": "npm run verify:sealing && npm run verify:rules && npm run verify:reissue && npm run verify:punchlist && npm run verify:pin-label && npm run verify:details",
+    "verify": "npm run verify:sealing && npm run verify:rules && npm run verify:reissue && npm run verify:punchlist && npm run verify:pin-label && npm run verify:details && npm run verify:working-copy",
     "verify:sealing": "node --import ./scripts/register-resolver.mjs scripts/verify-sealing.mjs",
     "verify:rules": "node --import ./scripts/register-resolver.mjs scripts/verify-rules-and-attribution.mjs",
     "preview": "vite preview",
     "verify:reissue": "node --import ./scripts/register-resolver.mjs scripts/verify-reissue.mjs",
     "verify:punchlist": "node --import ./scripts/register-resolver.mjs scripts/verify-punchlist.mjs",
     "verify:pin-label": "node --import ./scripts/register-resolver.mjs scripts/verify-pin-label.mjs",
-    "verify:details": "node --import ./scripts/register-resolver.mjs scripts/verify-item-details.mjs"
+    "verify:details": "node --import ./scripts/register-resolver.mjs scripts/verify-item-details.mjs",
+    "verify:working-copy": "node --import ./scripts/register-resolver.mjs scripts/verify-working-copy.mjs"
   },
   "dependencies": {
     "pdf-lib": "^1.17.1",

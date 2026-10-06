@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServices } from '../ServiceContainer';
+import { sheetIdFor } from '../sheetIdentity';
 
 /**
  * Owns the lifecycle of a loaded PDF: opening a file, selecting a page, and
@@ -10,7 +11,7 @@ import { useServices } from '../ServiceContainer';
  * and the annotation overlay both consume.
  */
 export function useSheetDocument() {
-  const { documents } = useServices();
+  const { documents, workingCopies } = useServices();
 
   const [state, setState] = useState({
     page: null,
@@ -50,7 +51,22 @@ export function useSheetDocument() {
       documentRef.current = null;
 
       try {
-        const loaded = await documents.load(await file.arrayBuffer());
+        // A working copy we exported carries its markups. They are restored
+        // as live markups BEFORE the drawing loads, and the bytes that come
+        // back no longer contain them — otherwise pdf.js would paint them into
+        // the page picture underneath the live ones, and the next export would
+        // write every markup a second time on top of its old self.
+        //
+        // Any other PDF comes back as the very same buffer, untouched.
+        const original = await file.arrayBuffer();
+        const { bytes } = await workingCopies.open(original, (index) => sheetIdFor(file.name, index));
+
+        // Export re-reads `sourceFile`, so it must hold the cleaned bytes too.
+        // Built BEFORE pdf.js sees the buffer, because pdf.js detaches it.
+        const sourceFile =
+          bytes === original ? file : new File([bytes], file.name, { type: 'application/pdf' });
+
+        const loaded = await documents.load(bytes);
         documentRef.current = loaded;
 
         setState({
@@ -58,7 +74,7 @@ export function useSheetDocument() {
           pageCount: loaded.getPageCount(),
           pageIndex: 0,
           fileName: file.name,
-          sourceFile: file,
+          sourceFile,
           isLoading: false,
           error: null,
         });
@@ -75,7 +91,7 @@ export function useSheetDocument() {
         });
       }
     },
-    [documents],
+    [documents, workingCopies],
   );
 
   // Dispose on unmount. pdf.js keeps a worker alive per document; without this,

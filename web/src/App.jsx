@@ -9,6 +9,7 @@ import { Toolbar } from './presentation/components/Toolbar';
 import { useConfirmation } from './presentation/components/ConfirmDialog';
 import { Icon } from './presentation/components/Icon';
 import { FlattenExportNotice } from './presentation/components/SealingNotice';
+import { sheetIdFor as sheetIdOf } from './presentation/sheetIdentity';
 
 // Loading these three barrels is what registers every annotation type with
 // AnnotationRegistry, every marker component with MarkerRegistry, and every
@@ -68,14 +69,11 @@ export default function App() {
     editor.reset();
   }, [editor, fileName]);
 
-  // Identity for one sheet.
-  //
-  // Derived from the file name and page index rather than a random id so it is
-  // STABLE ACROSS RELOADS — which is what lets localStorage hand the markups
-  // back after F5. In Sprint 2 this becomes the sheet's real database id, which
-  // is why `sheetIdFor` is passed to the exporter rather than assumed by it.
+  // Identity for one sheet — see presentation/sheetIdentity for why it is
+  // derived from the file name. Passed to the exporter rather than assumed by
+  // it, because in Sprint 2 it becomes the sheet's real database id.
   const sheetIdFor = useCallback(
-    (index) => (fileName ? `${fileName}#${index}` : null),
+    (index) => (fileName ? sheetIdOf(fileName, index) : null),
     [fileName],
   );
 
