@@ -47,7 +47,9 @@ func main() {
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-	mux.HandleFunc("/api/sheets/", handleSheetAnnotations)
+	mux.HandleFunc("/api/sheets/", handleSheets)
+	mux.HandleFunc("/api/exports", handleExports)
+	mux.HandleFunc("/api/exports/sealed", handleSealedIds)
 	mux.HandleFunc("/api/annotations/", handleSingleAnnotation)
 
 	log.Println("server running on :8080")
