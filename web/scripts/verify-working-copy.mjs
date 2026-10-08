@@ -15,7 +15,7 @@
  * live markups, the file stops drawing them underneath, and nothing anyone
  * else wrote in the file is touched.
  *
- * Run with: npm run verify:working-copy
+ * Run with: npm run verify -- working-copy
  */
 import assert from 'node:assert/strict';
 
