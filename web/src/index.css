@@ -836,6 +836,25 @@ button:disabled {
   color: #f0c976;
 }
 
+/* A flag's sentence in the panel, in the same tone the sheet tints it. */
+.notice-flag-danger {
+  background: rgba(232, 52, 42, 0.14);
+  border: 1px solid rgba(232, 52, 42, 0.45);
+  color: #ff9a92;
+}
+
+.notice-flag-warning {
+  background: rgba(208, 135, 0, 0.14);
+  border: 1px solid rgba(208, 135, 0, 0.42);
+  color: #f0c976;
+}
+
+.notice-flag-info {
+  background: rgba(74, 143, 231, 0.14);
+  border: 1px solid rgba(74, 143, 231, 0.45);
+  color: #a9c8f2;
+}
+
 .banner-row {
   display: flex;
   flex-direction: column;
@@ -864,6 +883,21 @@ button:disabled {
 
 [data-incomplete] > * {
   filter: drop-shadow(0 0 0 var(--status-review)) drop-shadow(0 0 3px var(--status-review));
+}
+
+/* Flagged markups, coloured by the flag's TONE rather than by which flag it
+   is — so a new flag in domain/flags needs no rule here. Written after
+   [data-incomplete] so a markup that is both shows the flag. */
+[data-flag-tone='danger'] > * {
+  filter: drop-shadow(0 0 1px var(--status-open)) drop-shadow(0 0 4px var(--status-open));
+}
+
+[data-flag-tone='warning'] > * {
+  filter: drop-shadow(0 0 1px var(--status-review)) drop-shadow(0 0 4px var(--status-review));
+}
+
+[data-flag-tone='info'] > * {
+  filter: drop-shadow(0 0 1px #4a8fe7) drop-shadow(0 0 4px #4a8fe7);
 }
 
 /* ===========================================================================
