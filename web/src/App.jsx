@@ -27,6 +27,8 @@ import './domain/rules';
 // assignee, due date — before any pin is read from storage, so stored values
 // are cleaned on the way in. See domain/details/index.js.
 import './domain/details';
+// Registers the flags the sheet and panel highlight — today, overdue items.
+import './domain/flags';
 import './presentation/components/markers';
 
 /**

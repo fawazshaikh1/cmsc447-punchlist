@@ -1,6 +1,7 @@
 import { PinStatus } from '../../domain/annotations';
 import { useMediaUrl } from '../media/useMediaUrl';
 import { ItemDetailsEditor } from './details';
+import { FlagNotices } from './FlagNotices';
 import { Icon } from './Icon';
 import { useConfirmation } from './ConfirmDialog';
 import { useCommitOnBlur } from './useCommitOnBlur';
@@ -183,6 +184,10 @@ export function PropertiesPanel({
             {violation.message}
           </p>
         ))}
+
+      {/* Overdue, and every other registered flag, each with its sentence.
+          This panel names no flag — see MarkupFlagRegistry. */}
+      <FlagNotices annotation={annotation} />
 
       {canLabel && (
         <label className={`field${descriptionProblem ? ' field-invalid' : ''}`}>
