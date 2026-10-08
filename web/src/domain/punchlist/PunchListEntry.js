@@ -36,8 +36,12 @@ export class PunchListEntry {
    *        changing what colour something is. A token the writer does not
    *        recognise simply prints in the neutral colour.
    * @param {Date} fields.createdAt    When it was raised.
+   * @param {{ label: string, value: string }[]} [fields.details] Trade,
+   *        company, due date and whatever else is recorded, already labelled
+   *        and formatted — see ItemDetails.labelled(). The writer prints them
+   *        as they come, so a new field reaches the schedule unedited.
    */
-  constructor({ number, pageIndex, description, status, statusKey, createdAt }) {
+  constructor({ number, pageIndex, description, status, statusKey, createdAt, details = [] }) {
     this.number = number;
     this.pageIndex = pageIndex;
     // An empty description is the normal case for an item raised in a hurry and
@@ -47,7 +51,21 @@ export class PunchListEntry {
     this.status = status;
     this.statusKey = statusKey ?? String(status).toLowerCase().replace(/\s+/g, '_');
     this.createdAt = createdAt;
+    this.details = Object.freeze(
+      (Array.isArray(details) ? details : [])
+        .filter((detail) => detail && detail.label && detail.value)
+        .map(({ label, value }) => Object.freeze({ label: String(label), value: String(value) })),
+    );
     Object.freeze(this);
+  }
+
+  /**
+   * "Trade: Electrical · Responsible company: Rivera Electric · Due date:
+   * 10 Oct 2026" — or '' when nothing is recorded, so a row with no details
+   * prints no empty second line.
+   */
+  get detailsForPrint() {
+    return this.details.map(({ label, value }) => `${label}: ${value}`).join('   ·   ');
   }
 
   /** The sheet as a person refers to it. */

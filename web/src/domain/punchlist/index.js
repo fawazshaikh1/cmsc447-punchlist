@@ -48,5 +48,9 @@ PunchListRegistry.register(PIN_KIND, (pin, { number, pageIndex }) =>
     status: statusLabel(pin.status),
     statusKey: pin.status,
     createdAt: pin.createdAt,
+    // Whatever item fields are registered and set — trade, company, assignee,
+    // due date. Read through the capability, so a pin built before details
+    // existed simply has none.
+    details: typeof pin.details?.labelled === 'function' ? pin.details.labelled() : [],
   }),
 );
