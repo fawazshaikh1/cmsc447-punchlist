@@ -18,6 +18,9 @@ import { PdfLibSheetExporter, FlattenedSheetExporter } from '../infrastructure/e
 import { LocalStorageAnnotationRepository } from '../infrastructure/persistence/LocalStorageAnnotationRepository';
 import { LocalStorageChangeLogRepository } from '../infrastructure/persistence/LocalStorageChangeLogRepository';
 import { LocalStorageExportHistoryRepository } from '../infrastructure/persistence/LocalStorageExportHistoryRepository';
+import { HttpAnnotationRepository } from '../infrastructure/persistence/HttpAnnotationRepository';
+import { HttpChangeLogRepository } from '../infrastructure/persistence/HttpChangeLogRepository';
+import { HttpExportHistoryRepository } from '../infrastructure/persistence/HttpExportHistoryRepository';
 import { CryptoIdGenerator } from '../infrastructure/identity/CryptoIdGenerator';
 
 /**
@@ -29,9 +32,11 @@ import { CryptoIdGenerator } from '../infrastructure/identity/CryptoIdGenerator'
  * base classes in `domain/`, so this is the single place to edit when an
  * implementation changes.
  *
- *   Moving persistence to the Go API in Sprint 2 is exactly this diff:
- *       - new LocalStorageAnnotationRepository()
- *       + new HttpAnnotationRepository('/api')
+ *   Persistence moves to the Go API by CONFIGURATION, not by a code change:
+ *   start the app with `VITE_API_BASE=/api` and markups, change history and
+ *   export history are read from and written to the server (SCRUM-41).
+ *   Without it they stay in this browser, so working on the frontend does
+ *   not require Go and Postgres to be running.
  *
  *   Adding sign-in in Sprint 2 is exactly this diff:
  *       - new StaticIdentityProvider()
@@ -94,9 +99,18 @@ export function ServiceContainer({
   // the expected type, rather than three screens deep as "undefined is not a
   // function".
   const services = useMemo(() => {
-    const repo = repository ?? new LocalStorageAnnotationRepository();
-    const exports_ = exportHistory ?? new LocalStorageExportHistoryRepository();
-    const log = changeLog ?? new LocalStorageChangeLogRepository();
+    // WHERE MARKUPS AND THEIR HISTORY LIVE. The Go API when the app is
+    // started with VITE_API_BASE (e.g. `/api`, proxied to the Go server by
+    // vite.config.js); this browser's local storage otherwise. All three
+    // switch together — markups on the server with their history left on one
+    // tablet would split the audit trail from the thing it describes.
+    const api = import.meta.env?.VITE_API_BASE;
+    const repo =
+      repository ?? (api ? new HttpAnnotationRepository(api) : new LocalStorageAnnotationRepository());
+    const exports_ =
+      exportHistory ?? (api ? new HttpExportHistoryRepository(api) : new LocalStorageExportHistoryRepository());
+    const log =
+      changeLog ?? (api ? new HttpChangeLogRepository(api) : new LocalStorageChangeLogRepository());
     const ids = new CryptoIdGenerator();
     const annotations = new AnnotationService(repo, ids);
 
