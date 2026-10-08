@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts } from 'pdf-lib';
 
 import { SheetExporter } from '../../domain/ports/SheetExporter';
 import { assignOrdinals } from '../../domain/punchlist';
+import { annotationCount, markDocument, tagAnnotationsSince } from '../workingcopy/workingCopyFormat';
 import { PdfWriterRegistry } from './PdfWriterRegistry';
 import { ensureDefaultFontResource } from './pdfPrimitives';
 
@@ -36,6 +37,15 @@ import './writers';
  * worker — and because it implements the SheetExporter contract, that migration
  * is a new adapter plus one line in the composition root. The pdf-lib code
  * itself runs unchanged under Node.
+ *
+ * ---------------------------------------------------------------------------
+ * A WORKING COPY CAN BE REOPENED AND EDITED
+ * ---------------------------------------------------------------------------
+ * Each annotation written here also carries the markup it came from, under a
+ * private key every viewer ignores (see workingcopy/workingCopyFormat). Opened
+ * in this app again, the markups come back live and selectable instead of as
+ * part of the page picture. Done around each write rather than inside the
+ * writers, so no writer knows the format exists and a new one gets it free.
  */
 export class PdfLibSheetExporter extends SheetExporter {
   /**
@@ -82,6 +92,7 @@ export class PdfLibSheetExporter extends SheetExporter {
     // agree about which item is which, or a comment on one cannot be matched to
     // a mark on the other.
     const ordinals = assignOrdinals(pages);
+    let tagged = 0;
 
     for (const { pageIndex, annotations } of pages) {
       // Defensive: a stale sheet id could reference a page that no longer
@@ -116,6 +127,7 @@ export class PdfLibSheetExporter extends SheetExporter {
         // Throws on an unregistered kind rather than skipping. Silently
         // dropping a markup from a file about to be sent to a client is data
         // loss, and the user would not find out until the client asked.
+        const before = annotationCount(page);
         await PdfWriterRegistry.write(annotation, {
           pdfDoc,
           page,
@@ -132,8 +144,11 @@ export class PdfLibSheetExporter extends SheetExporter {
           // while exporting — it can only read.
           loadMedia: (key) => this.media?.get(key) ?? Promise.resolve(null),
         });
+        tagged += tagAnnotationsSince(page, before, annotation);
       }
     }
+
+    if (tagged > 0) markDocument(pdfDoc);
 
     return pdfDoc.save();
   }
