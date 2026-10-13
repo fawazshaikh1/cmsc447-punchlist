@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useRef } from 'react';
 
+import { MarkupFlagRegistry } from '../../domain/flags';
 import { ViewportPoint } from '../../domain/geometry/ViewportPoint';
+import { currentFlagContext } from '../flags/flagContext';
 import { ErrorBoundary } from './ErrorBoundary';
 import { SourceAnnotationLayer } from './SourceAnnotationLayer';
 import { MarkerRegistry } from './markers';
@@ -12,6 +14,21 @@ import { MarkerRegistry } from './markers';
  * render in one state recovers the moment it leaves that state — rather than
  * staying permanently broken for the rest of the session.
  */
+/**
+ * `data-flags` (every flag id, space-separated, so CSS can match one with
+ * `~=`) and `data-flag-tone` (the most serious tone) for a marker's wrapper.
+ * Empty when no flag applies, so unflagged markups carry no attributes.
+ */
+function flagAttributes(annotation, context) {
+  const flags = MarkupFlagRegistry.flagsFor(annotation, context);
+  if (flags.length === 0) return {};
+
+  return {
+    'data-flags': flags.map((flag) => flag.getId()).join(' '),
+    'data-flag-tone': MarkupFlagRegistry.strongestTone(flags),
+  };
+}
+
 function markerResetKey(annotation) {
   try {
     const { x, y } = annotation.getAnchor();
@@ -132,6 +149,10 @@ function releasePointer(element, pointerId) {
  * props is what keeps that true: a seventh markup type gets both treatments for
  * free, and a marker author never has to remember to honour them. It is also why
  * adding the second one just now cost one attribute rather than six components.
+ *
+ * The third went one step further: `data-flags` and `data-flag-tone` come from
+ * MarkupFlagRegistry, so overdue — and any flag after it — is drawn without
+ * this file, the markers, or the stylesheet knowing which flag it is.
  */
 export function AnnotationLayer({
   page,
@@ -149,6 +170,10 @@ export function AnnotationLayer({
   onGestureEnd,
   onGestureCancel,
 }) {
+  // Today, for the flags. Recomputed each render rather than memoised, so a
+  // sheet left open past midnight picks up the new day on its next render.
+  const flagContext = currentFlagContext();
+
   // Scale 1 => output is in this SVG's own coordinate space.
   const layout = useMemo(() => page.createTransformer(1, rotation), [page, rotation]);
 
@@ -256,6 +281,10 @@ export function AnnotationLayer({
             // Rendered only when true, so the attribute selectors in the
             // stylesheet stay simple presence checks.
             data-incomplete={incompleteIds?.has(annotation.id) ? 'true' : undefined}
+            // Every registered flag that applies, and the most serious tone
+            // among them. Generic on purpose: the stylesheet colours by TONE,
+            // so a new flag is drawn correctly without a CSS rule of its own.
+            {...flagAttributes(annotation, flagContext)}
           >
             <ErrorBoundary
               // Remounting on any geometry change clears a previous failure, so
