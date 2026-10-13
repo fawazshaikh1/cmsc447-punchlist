@@ -3,6 +3,12 @@ import { createContext, useContext, useMemo } from 'react';
 import { CommandHistory } from '../domain/commands';
 import { StaticIdentityProvider } from '../domain/identity/StaticIdentityProvider';
 import {
+  BrowserUploadService,
+  UploadingAnnotationRepository,
+  UploadingChangeLogRepository,
+  UploadingExportHistoryRepository,
+} from '../domain/upload';
+import {
   ActiveSeals,
   CompositeEditPolicy,
   SealedByExportPolicy,
@@ -21,6 +27,7 @@ import { LocalStorageExportHistoryRepository } from '../infrastructure/persisten
 import { HttpAnnotationRepository } from '../infrastructure/persistence/HttpAnnotationRepository';
 import { HttpChangeLogRepository } from '../infrastructure/persistence/HttpChangeLogRepository';
 import { HttpExportHistoryRepository } from '../infrastructure/persistence/HttpExportHistoryRepository';
+import { LocalStorageUploadLedger } from '../infrastructure/persistence/LocalStorageUploadLedger';
 import { CryptoIdGenerator } from '../infrastructure/identity/CryptoIdGenerator';
 
 /**
@@ -99,18 +106,17 @@ export function ServiceContainer({
   // the expected type, rather than three screens deep as "undefined is not a
   // function".
   const services = useMemo(() => {
-    // WHERE MARKUPS AND THEIR HISTORY LIVE. The Go API when the app is
-    // started with VITE_API_BASE (e.g. `/api`, proxied to the Go server by
-    // vite.config.js); this browser's local storage otherwise. All three
-    // switch together — markups on the server with their history left on one
-    // tablet would split the audit trail from the thing it describes.
+    // WHERE MARKUPS AND THEIR HISTORY LIVE. The Go API by default —
+    // VITE_API_BASE is `/api` in web/.env, proxied to the Go server by
+    // vite.config.js — and this browser's local storage when started with
+    // `npm run dev:browser`. All three switch together: markups on the server
+    // with their history left on one tablet would split the audit trail from
+    // the thing it describes.
     const api = import.meta.env?.VITE_API_BASE;
-    const repo =
-      repository ?? (api ? new HttpAnnotationRepository(api) : new LocalStorageAnnotationRepository());
-    const exports_ =
-      exportHistory ?? (api ? new HttpExportHistoryRepository(api) : new LocalStorageExportHistoryRepository());
-    const log =
-      changeLog ?? (api ? new HttpChangeLogRepository(api) : new LocalStorageChangeLogRepository());
+    const stores = api ? serverStores(api) : browserStores();
+    const repo = repository ?? stores.annotations;
+    const exports_ = exportHistory ?? stores.exports;
+    const log = changeLog ?? stores.changeLog;
     const ids = new CryptoIdGenerator();
     const annotations = new AnnotationService(repo, ids);
 
@@ -225,4 +231,39 @@ export function useServices() {
     throw new Error('useServices() must be called inside a <ServiceContainer>.');
   }
   return services;
+}
+
+/** This browser's local storage — `npm run dev:browser`, and the source of the one-time upload. */
+function browserStores() {
+  return {
+    annotations: new LocalStorageAnnotationRepository(),
+    changeLog: new LocalStorageChangeLogRepository(),
+    exports: new LocalStorageExportHistoryRepository(),
+  };
+}
+
+/**
+ * The Go API, wrapped so that whatever this browser saved before server mode
+ * existed is uploaded the first time each sheet or document is used. Nothing
+ * that reads these stores knows the upload happens — see domain/upload.
+ *
+ * @param {string} api Base URL, e.g. '/api'.
+ */
+function serverStores(api) {
+  const server = {
+    annotations: new HttpAnnotationRepository(api),
+    changeLog: new HttpChangeLogRepository(api),
+    exports: new HttpExportHistoryRepository(api),
+  };
+  const uploads = new BrowserUploadService({
+    local: browserStores(),
+    server,
+    ledger: new LocalStorageUploadLedger(),
+  });
+
+  return {
+    annotations: new UploadingAnnotationRepository(server.annotations, uploads),
+    changeLog: new UploadingChangeLogRepository(server.changeLog, uploads),
+    exports: new UploadingExportHistoryRepository(server.exports, uploads),
+  };
 }

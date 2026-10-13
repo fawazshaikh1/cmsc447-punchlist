@@ -18,6 +18,15 @@
 /** Gateway answers that mean "the API behind me is not there". */
 const UNREACHABLE = new Set([502, 503, 504]);
 
+/**
+ * In development the server is the default, so a teammate who has not started
+ * it needs to be told the other way to work. A deployed build never shows
+ * this — there is no dev:browser there to suggest.
+ */
+const DEV_HINT = import.meta.env?.DEV
+  ? ' To work without it, run `npm run dev:browser` instead.'
+  : '';
+
 export class HttpJsonClient {
   /**
    * @param {string} baseUrl e.g. '/api'. No trailing slash.
@@ -68,7 +77,7 @@ export class HttpJsonClient {
       response = await this.fetchFn(`${this.baseUrl}${path}`, init);
     } catch (cause) {
       throw new Error(
-        `Cannot reach the Punch List server at ${this.baseUrl || '/'}. Is the backend running?`,
+        `Cannot reach the Punch List server at ${this.baseUrl || '/'}. Is the backend running?${DEV_HINT}`,
         { cause },
       );
     }
@@ -80,7 +89,8 @@ export class HttpJsonClient {
       if (UNREACHABLE.has(response.status)) {
         throw new Error(
           `The Punch List server at ${this.baseUrl || '/'} is not responding ` +
-            `(${response.status} ${response.statusText}). Is the backend running?`.replace(' )', ')'),
+            `(${response.status} ${response.statusText}). Is the backend running?`.replace(' )', ')') +
+            DEV_HINT,
         );
       }
       throw new Error(
