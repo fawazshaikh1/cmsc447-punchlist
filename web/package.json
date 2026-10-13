@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:browser": "vite --mode browser",
     "build": "vite build",
     "lint": "oxlint",
     "verify": "node scripts/verify-all.mjs",
