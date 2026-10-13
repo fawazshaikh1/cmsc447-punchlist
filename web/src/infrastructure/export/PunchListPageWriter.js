@@ -87,6 +87,13 @@ export class PunchListPageWriter {
     const rows = entries.map((entry) => ({
       entry,
       lines: wrap(entry.descriptionForPrint, layout.columns.description.width, layout.size.body, regular),
+      // Trade, company, due date and the rest, under the description rather
+      // than in columns of their own. The description column is the only one
+      // with room, and a column per field would squeeze it to nothing the day
+      // a fifth field arrives — this line simply wraps.
+      detailLines: entry.detailsForPrint
+        ? wrap(entry.detailsForPrint, layout.columns.description.width, layout.size.detail, regular)
+        : [],
     }));
 
     const pages = paginate(rows, layout);
@@ -160,6 +167,7 @@ export class PunchListPageWriter {
       meta: 9 * t,
       heading: 8 * t,
       body: 10 * t,
+      detail: 8.5 * t,
       footer: 8 * t,
     };
 
@@ -189,6 +197,9 @@ export class PunchListPageWriter {
       size,
       columns,
       lineHeight: size.body * 1.35,
+      detailLineHeight: size.detail * 1.35,
+      // Between the last line of the description and the first detail line.
+      detailGap: 3 * s,
       rowPadding: 7 * s,
       minRowHeight: size.body * 2.4,
       // Where rows may run to before spilling onto another page. The footer
@@ -298,9 +309,9 @@ export class PunchListPageWriter {
     return baseline - 12 * s;
   }
 
-  #drawRow(page, layout, y, { entry, lines }, fonts) {
+  #drawRow(page, layout, y, { entry, lines, detailLines }, fonts) {
     const { columns, size, s, margin, contentWidth } = layout;
-    const height = rowHeight(lines, layout);
+    const height = rowHeight({ lines, detailLines }, layout);
     const top = y;
     const textTop = top - size.body;
 
@@ -339,6 +350,21 @@ export class PunchListPageWriter {
         // An item nobody wrote up is greyed, so it reads as a gap rather than
         // as a description that happens to say "(no description)".
         color: entry.description ? INK : MUTED,
+      });
+    });
+
+    // Smaller and muted, so the description stays what the eye lands on.
+    // Baselines step by the DETAIL line height from just below the
+    // description — the same arithmetic rowHeight reserves space with.
+    const detailTop = textTop - (lines.length - 1) * layout.lineHeight
+      - layout.lineHeight + size.body - size.detail - layout.detailGap;
+    detailLines.forEach((line, index) => {
+      write(page, line, {
+        x: columns.description.x,
+        y: detailTop - index * layout.detailLineHeight,
+        size: size.detail,
+        font: fonts.regular,
+        color: MUTED,
       });
     });
 
@@ -425,11 +451,19 @@ function write(page, value, options) {
 
 // --- layout helpers ----------------------------------------------------------
 
-/** How tall a row has to be to fit its wrapped description. */
-function rowHeight(lines, layout) {
+/**
+ * How tall a row has to be to fit its wrapped description and detail lines.
+ * Pagination and drawing both call this, so a row is never drawn taller than
+ * the space pagination set aside for it.
+ */
+function rowHeight({ lines, detailLines = [] }, layout) {
+  const details = detailLines.length > 0
+    ? layout.detailGap + detailLines.length * layout.detailLineHeight
+    : 0;
+
   return Math.max(
     layout.minRowHeight,
-    lines.length * layout.lineHeight + layout.rowPadding * 2,
+    lines.length * layout.lineHeight + details + layout.rowPadding * 2,
   );
 }
 
@@ -446,7 +480,7 @@ function paginate(rows, layout) {
   let y = layout.height - layout.margin - layout.headerHeight.first;
 
   for (const row of rows) {
-    const height = rowHeight(row.lines, layout);
+    const height = rowHeight(row, layout);
 
     if (current.length > 0 && y - height < layout.bottom) {
       pages.push(current);

@@ -120,6 +120,29 @@ export class ItemDetails {
     return Object.keys(values).length === 0 ? ItemDetails.EMPTY : new ItemDetails(values);
   }
 
+  /**
+   * The fields that are set, as a reader sees them — label and formatted
+   * value, in the order the fields are registered. What a printed schedule, a
+   * report or a CSV shows, so each of them picks up a new field without being
+   * edited.
+   *
+   * Values under keys this build does not know are left out: there is no
+   * label to print them under. They are still stored and carried through.
+   *
+   * @returns {{ key: string, label: string, value: string }[]}
+   */
+  labelled() {
+    return ItemFieldRegistry.all()
+      .map((field) => ({ field, value: this.get(field.getKey()) }))
+      .filter(({ value }) => value !== '')
+      .map(({ field, value }) => ({
+        key: field.getKey(),
+        label: field.getLabel(),
+        value: field.format(value),
+      }))
+      .filter(({ value }) => value !== '');
+  }
+
   /** @returns {boolean} */
   isEmpty() {
     return Object.keys(this.#values).length === 0;
