@@ -411,18 +411,39 @@ Each markup becomes a real PDF annotation, not a flattened picture:
 from the geometry; Chrome and most mobile viewers would render nothing at all.
 Testing only in Acrobat is how that ships broken.
 
-## How to move persistence to the Go API (Sprint 2)
+## Saving to the Go API (SCRUM-41)
 
-One line in `ServiceContainer.jsx`:
+Persistence is chosen by **configuration**, not code. Start the app in server
+mode and markups, change history and export history all go through the Go API;
+start it normally and they stay in the browser, so frontend work never needs Go
+or Postgres running.
 
-```diff
-- const repo = repository ?? new LocalStorageAnnotationRepository();
-+ const repo = repository ?? new HttpAnnotationRepository('/api');
+```bash
+# 1. Database (once): create it and load the schema
+createdb punchlist && psql punchlist -f backend/schema.sql
+
+# 2. API on :8080 (DATABASE_URL defaults to postgres://postgres:dev@localhost:5432/punchlist)
+cd backend && go run .
+
+# 3. App in server mode — /api is proxied to :8080 by vite.config.js
+cd web && npm run dev -- --mode server
 ```
 
-`HttpAnnotationRepository` is already written and documents the exact endpoint
-contract the Go service must satisfy. Hand it to whoever owns the backend — the
-payload shape is already fixed by what localStorage writes today.
+`--mode server` loads `web/.env.server`, which sets `VITE_API_BASE=/api`. The
+composition root (`ServiceContainer.jsx`) then wires `HttpAnnotationRepository`,
+`HttpChangeLogRepository` and `HttpExportHistoryRepository` instead of the
+local-storage ones — all three together, so a markup's history never lives
+somewhere other than the markup. Set `API_TARGET` to proxy somewhere other than
+`localhost:8080`.
+
+If the server is down the app says so — *"The Punch List server at /api is not
+responding (502 Bad Gateway). Is the backend running?"* — rather than "Failed
+to fetch". A failed sealed-markups request throws instead of returning nothing,
+so an issued markup can never quietly become editable.
+
+`npm run verify -- http` runs the repositories against a stand-in that mirrors
+`backend/main.go` and `backend/history.go`. It proves the app speaks the API's
+contract; only running the real server proves the Go code and Postgres do.
 
 ## How to add pinch-zoom (Sprint 2)
 

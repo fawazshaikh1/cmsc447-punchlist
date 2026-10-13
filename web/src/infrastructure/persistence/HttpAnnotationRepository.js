@@ -1,12 +1,16 @@
 import { AnnotationRegistry } from '../../domain/annotations/AnnotationRegistry';
 import { AnnotationRepository } from '../../domain/ports/AnnotationRepository';
+import { HttpJsonClient } from './HttpJsonClient';
 
 /**
  * Repository backed by the Go API. TIER 3.
  *
  * ===========================================================================
- * NOT WIRED IN SPRINT 1 — the API does not exist yet.
+ * WIRED WHEN `VITE_API_BASE` IS SET (SCRUM-41) — see ServiceContainer.
  * ===========================================================================
+ * Written in Sprint 1, before the API existed, and unchanged in what it sends:
+ * the Go service was built to the contract below.
+ *
  * It is written now, and fully implemented rather than stubbed, because it is
  * the concrete proof that the contract abstraction pays for itself. Switching
  * the entire application from local storage to the server is one line in
@@ -42,10 +46,12 @@ export class HttpAnnotationRepository extends AnnotationRepository {
    * @param {string} baseUrl e.g. '/api'
    * @param {typeof fetch} [fetchFn] Injectable so tests need no network.
    */
-  constructor(baseUrl, fetchFn = globalThis.fetch.bind(globalThis)) {
+  constructor(baseUrl, fetchFn) {
     super();
-    this.baseUrl = baseUrl;
-    this.fetchFn = fetchFn;
+    // Shared with the change-log and export-history repositories, so all
+    // three report "Cannot reach the Punch List server" the same way rather
+    // than a bare "Failed to fetch" when the backend is not running.
+    this.http = new HttpJsonClient(baseUrl, fetchFn);
   }
 
   async listBySheet(sheetId) {
@@ -78,12 +84,6 @@ export class HttpAnnotationRepository extends AnnotationRepository {
    *        contract and keeping outbox replay safe to retry.
    */
   async #request(path, init, tolerate = []) {
-    const response = await this.fetchFn(`${this.baseUrl}${path}`, init);
-    if (!response.ok && !tolerate.includes(response.status)) {
-      throw new Error(
-        `${init?.method ?? 'GET'} ${path} failed: ${response.status} ${response.statusText}`,
-      );
-    }
-    return response;
+    return this.http.request(path, init, tolerate);
   }
 }
