@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "verify": "npm run verify:sealing && npm run verify:rules && npm run verify:reissue && npm run verify:punchlist && npm run verify:pin-label && npm run verify:details",
+    "verify": "node scripts/verify-all.mjs",
     "verify:sealing": "node --import ./scripts/register-resolver.mjs scripts/verify-sealing.mjs",
     "verify:rules": "node --import ./scripts/register-resolver.mjs scripts/verify-rules-and-attribution.mjs",
     "preview": "vite preview",
