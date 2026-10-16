@@ -445,15 +445,43 @@ so an issued markup can never quietly become editable.
 `backend/main.go` and `backend/history.go`. It proves the app speaks the API's
 contract; only running the real server proves the Go code and Postgres do.
 
-## How to add pinch-zoom (Sprint 2)
+## Pinch-zoom and two-finger pan (SCRUM-48)
 
-Replace the internals of `presentation/hooks/useViewState.js`. Everything
-downstream consumes `scale` and `rotation`, not gesture state, so a gesture
-library attaches there and nowhere else.
+Zoom is still one number, `scale`, owned by `useViewState`. The gesture code in
+`presentation/gestures/` only asks for a new one through `zoomTo`, so the
+canvas, the overlay and the screen->PDF maths never learn that pinching exists.
+No gesture library: the rule was that one must expose its scale and
+translation, because the screen->PDF conversion needs them. Owning the gesture
+keeps the only lasting transform the one the coordinate code already knows —
+`scale` — and costs four small files.
 
-**Selection criterion:** the library must expose its current scale and
-translation. One that hides its transform internally is unusable — those
-numbers are exactly what the screen→PDF conversion needs.
+| File | Job |
+|---|---|
+| `TouchGestureArbiter.js` | decides what each touch is — one finger draws, two fingers zoom. Plain class, no DOM, tested with a fake clock |
+| `usePinchZoom.js` | the DOM half: capture-phase listeners on the stage, the CSS preview, the commit, the scroll that keeps the spot under the fingers |
+| `pinchGeometry.js` | the arithmetic — midpoint, the anchor as a fraction of the sheet, the scroll that puts it back |
+| `zoomLimits.js` | 25%–800%, shared with the zoom buttons |
+
+**A pinch never draws.** Two fingers land tens of milliseconds apart, so the
+first touch is held for up to 120 ms. A second finger in that window makes it a
+pinch and the sheet never hears about the first. Lifting the finger (a tap), or
+moving it more than 8 px (a drag), hands it over at once, so a pin still lands
+on the tap and a stroke still starts where the finger went down — the held
+`pointerdown` is replayed at its original target. A mouse or pen is never held.
+
+**Preview, then commit.** While the fingers move, the sheet is scaled with a CSS
+transform — re-rendering an E-size sheet through pdf.js sixty times a second is
+not an option. When they lift, `scale` is set once and the stage is scrolled so
+the spot that was between the fingers is between them again. That scroll runs
+in a passive effect on purpose: the sheet is sized by `SheetCanvas`'s own
+effect, and a parent's effects run after its children's.
+
+A trackpad pinch arrives as `wheel` with `ctrlKey` set and takes the same commit
+path, zooming about the cursor. Plain scrolling is left to the browser. The
+stage has `touch-action: none` so the browser's own page zoom does not fight
+the sheet's.
+
+`npm run verify -- pinch` covers the arbiter's decisions and the geometry.
 
 ## Directory map
 
@@ -500,6 +528,7 @@ web/src/
   presentation/                TIER 1 — React
     ServiceContainer.jsx       COMPOSITION ROOT — the only wiring file
     hooks/                     document / view state / annotations / drawing / export
+    gestures/                  pinch-zoom and two-finger pan (SCRUM-48)
     components/                canvas, overlay, toolbar, palette, inspector
       markers/                 7 SVG components + MarkerRegistry
     media/                     MediaUrlCache + useMediaUrl — object URLs made
