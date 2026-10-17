@@ -129,6 +129,51 @@ export class EditorService {
   }
 
   /**
+   * Whether a new markup of this kind would be permitted — asked before there
+   * is a markup, to decide which tools to offer.
+   *
+   * @param {string} kind e.g. 'photo'.
+   * @returns {import('../policy').EditDecision}
+   */
+  canCreate(kind) {
+    return this.policy.check({
+      annotation: null,
+      kind,
+      intent: EditPolicy.INTENT.CREATE,
+      actor: this.identity.current(),
+    });
+  }
+
+  /**
+   * Whether issuing a flattened PDF — which locks every markup in it — would be
+   * permitted. Decides whether the interface offers "Issue PDF" at all.
+   *
+   * @returns {import('../policy').EditDecision}
+   */
+  canIssue() {
+    return this.policy.check({
+      annotation: null,
+      intent: EditPolicy.INTENT.ISSUE,
+      actor: this.identity.current(),
+    });
+  }
+
+  /**
+   * Whether clearing a whole sheet would be permitted for this person —
+   * whether to offer the control at all. Issued markups are still skipped by
+   * `clearSheet` itself; this is about the role, asked with no markup.
+   *
+   * @returns {import('../policy').EditDecision}
+   */
+  canClearSheet() {
+    return this.policy.check({
+      annotation: null,
+      intent: EditPolicy.INTENT.DELETE,
+      actor: this.identity.current(),
+    });
+  }
+
+  /**
    * True when nothing at all may be changed about this annotation.
    * @param {import('../annotations/Annotation').Annotation} annotation
    */

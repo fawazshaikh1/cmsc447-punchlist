@@ -85,7 +85,21 @@ export function useSheetEditor({
   const draftRef = useRef(null);
   const movingRef = useRef(null);
 
-  const tool = ToolRegistry.resolve(toolId) ?? ToolRegistry.default();
+  /**
+   * Whether the signed-in person's role lets them use this tool: selecting is
+   * always allowed, a drawing tool when they may create what it makes. Asked
+   * of the policy, so this hook holds no rule about roles (SCRUM-47).
+   */
+  const canUseTool = useCallback(
+    (candidate) => candidate.isSelection() || editor.canCreate(candidate.createsKind()).allowed,
+    [editor],
+  );
+
+  // A tool the role may not use is never the active one — a collaborator who
+  // opens the app with Pin as the default lands on the first tool they may
+  // use instead of on a tool whose every tap would be refused.
+  const chosen = ToolRegistry.resolve(toolId) ?? ToolRegistry.default();
+  const tool = canUseTool(chosen) ? chosen : (ToolRegistry.all().find(canUseTool) ?? chosen);
 
   const context = useMemo(
     () => ({
@@ -228,14 +242,18 @@ export function useSheetEditor({
   /** Runs a mutation, then re-reads so the screen always matches storage. */
   const run = useCallback(
     async (mutate) => {
+      let failure = null;
       try {
         await mutate();
-        setError(null);
       } catch (cause) {
-        setError(cause instanceof Error ? cause.message : String(cause));
+        failure = cause instanceof Error ? cause.message : String(cause);
       }
       setRevision((n) => n + 1);
       await reload();
+      // AFTER the reload, which clears the error when the sheet loads fine. Set
+      // before it, a refused or failed change was wiped off the screen a moment
+      // later, and the button looked as if it simply did nothing.
+      if (failure) setError(failure);
     },
     [reload],
   );
@@ -478,8 +496,9 @@ export function useSheetEditor({
     select: setSelectedId,
 
     tool,
-    toolId,
+    toolId: tool.getId(),
     selectTool: setToolId,
+    canUseTool,
     style,
     setStyle,
 
@@ -494,6 +513,7 @@ export function useSheetEditor({
     resize,
     canResize,
     clearSheet,
+    canClearSheet: editor.canClearSheet().allowed,
 
     // Permission and completeness, as data rather than as rules this layer
     // knows. Both come from EditorService so there is one answer in the app.
