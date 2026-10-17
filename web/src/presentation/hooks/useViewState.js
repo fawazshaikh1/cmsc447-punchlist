@@ -1,9 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Rotation } from '../../domain/geometry/PageGeometry';
+import { clampScale, MAX_SCALE, MIN_SCALE } from '../gestures/zoomLimits';
 
-/** 25% reads a whole E-size sheet; 800% reads a dimension string. */
-const MIN_SCALE = 0.25;
-const MAX_SCALE = 8;
 const ZOOM_STEP = 1.5;
 
 /**
@@ -18,15 +16,13 @@ const ZOOM_STEP = 1.5;
  * adding a pin does not tear down and re-render the canvas.
  *
  * ---------------------------------------------------------------------------
- * THIS IS ALSO THE SPRINT 2 GESTURE SEAM
+ * THIS IS ALSO THE GESTURE SEAM
  * ---------------------------------------------------------------------------
- * A pinch-zoom library (react-zoom-pan-pinch, @use-gesture/react) replaces the
- * INTERNALS of this hook and nothing else, because everything downstream
- * consumes `scale` and `rotation` rather than reaching into gesture state.
- *
- * Selection criterion for that library: it must EXPOSE its current scale and
- * translation. One that hides its transform internally is unusable here, since
- * those numbers are exactly what the screen -> PDF conversion needs.
+ * Pinch-zoom (presentation/gestures/usePinchZoom) attaches through `zoomTo`
+ * and nothing else, because everything downstream consumes `scale` and
+ * `rotation` rather than reaching into gesture state. Any replacement gesture
+ * code must keep it that way: the screen -> PDF conversion needs the real
+ * scale, so a transform hidden inside a gesture layer would break it.
  */
 export function useViewState(initial = {}) {
   const [scale, setScale] = useState(initial.scale ?? 1);
@@ -44,7 +40,15 @@ export function useViewState(initial = {}) {
 
   const resetZoom = useCallback(() => setScale(1), []);
 
+  /**
+   * Any zoom inside the limits — what a pinch or a trackpad sets, as opposed
+   * to the buttons' fixed steps. The gesture lives in usePinchZoom; this only
+   * stores the result, which is what keeps every consumer of `scale`
+   * unaware that pinching exists.
+   */
+  const zoomTo = useCallback((next) => setScale(clampScale(next)), []);
+
   const rotateClockwise = useCallback(() => setRotation((r) => (r + 90) % 360), []);
 
-  return { scale, rotation, zoomIn, zoomOut, resetZoom, rotateClockwise };
+  return { scale, rotation, zoomIn, zoomOut, resetZoom, zoomTo, rotateClockwise };
 }

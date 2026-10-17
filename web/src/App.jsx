@@ -50,7 +50,7 @@ export default function App() {
     page, pageCount, pageIndex, fileName, sourceFile, isLoading, error, openFile, openPage,
   } = useSheetDocument();
 
-  const { scale, rotation, zoomIn, zoomOut, resetZoom, rotateClockwise } = useViewState();
+  const { scale, rotation, zoomIn, zoomOut, resetZoom, zoomTo, rotateClockwise } = useViewState();
   const { busy: isExporting, message: exportMessage, error: exportError, exportDocument } = useExport();
   const { editor, exportsFlattened } = useServices();
   const { ask, dialog } = useConfirmation();
@@ -206,6 +206,7 @@ export default function App() {
             rotation={rotation}
             panelOpen={panelOpen}
             onPanelOpenChange={setPanelOpen}
+            onZoomTo={zoomTo}
           />
         </div>
       ) : (

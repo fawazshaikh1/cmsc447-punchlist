@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { usePinchZoom } from '../gestures/usePinchZoom';
 
 import { useServices } from '../ServiceContainer';
 import { useSheetEditor } from '../hooks/useSheetEditor';
@@ -29,6 +31,7 @@ export function SheetViewer({
   rotation,
   panelOpen,
   onPanelOpenChange,
+  onZoomTo,
 }) {
   // How a tool that declares `requiresText()` gets its text. Owned here rather
   // than inside the hook so the hook stays free of JSX and of any opinion about
@@ -67,6 +70,13 @@ export function SheetViewer({
     promptForText,
     capturePhoto,
   });
+
+  // Two fingers zoom and pan; one finger still draws. The hook only asks for a
+  // new scale through onZoomTo — everything below keeps consuming `scale` the
+  // way it does for the zoom buttons. See presentation/gestures.
+  const stageRef = useRef(null);
+  const sheetRef = useRef(null);
+  usePinchZoom({ stageRef, sheetRef, scale, onZoomTo, onCancelGesture: editor.cancel });
 
   // Comments that were already in the uploaded PDF. Read-only.
   //
@@ -161,11 +171,11 @@ export function SheetViewer({
           wrapper, so all three are direct children of the `.app-body` grid.
           That is what lets the panel become a slide-over at tablet width by
           changing one grid definition rather than re-nesting anything. */}
-      <div className="stage">
+      <div className="stage" ref={stageRef}>
         {/* .sheet-frame is position:relative + inline-block, which anchors the
             absolutely-positioned overlay and shrinks the wrapper to exactly the
             canvas, so the overlay's bounding rect equals the canvas's. */}
-        <div className="sheet-frame">
+        <div className="sheet-frame" ref={sheetRef}>
           <SheetCanvas page={page} scale={scale} rotation={rotation} />
           <AnnotationLayer
             page={page}

@@ -508,6 +508,11 @@ button:disabled {
   background-image: radial-gradient(circle at 1px 1px, var(--ink-700) 1px, transparent 0);
   background-size: 28px 28px;
   z-index: var(--z-stage);
+  /* Every touch on the drawing area is the app's to interpret — one finger
+     draws, two zoom and pan (usePinchZoom). Without this, Safari on an iPad
+     zooms the whole page on a pinch instead of the drawing. */
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 /* position:relative + inline-block anchors the SVG overlay and shrinks the
