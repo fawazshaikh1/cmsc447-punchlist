@@ -413,37 +413,68 @@ Testing only in Acrobat is how that ships broken.
 
 ## Saving to the Go API (SCRUM-41)
 
-Persistence is chosen by **configuration**, not code. Start the app in server
-mode and markups, change history and export history all go through the Go API;
-start it normally and they stay in the browser, so frontend work never needs Go
-or Postgres running.
+**The app saves to the server by default.** `npm run dev` reads and writes
+markups, change history and export history through the Go API.
+`npm run dev:browser` saves in the browser instead, for working on the frontend
+without Go or Postgres.
+
+### One-time setup (macOS)
 
 ```bash
-# 1. Database (once): create it and load the schema
-createdb punchlist && psql punchlist -f backend/schema.sql
+brew install go postgresql@17
+brew services start postgresql@17
 
-# 2. API on :8080 (DATABASE_URL defaults to postgres://postgres:dev@localhost:5432/punchlist)
-cd backend && go run .
-
-# 3. App in server mode — /api is proxied to :8080 by vite.config.js
-cd web && npm run dev -- --mode server
+# The login backend/main.go expects by default: postgres / dev
+/opt/homebrew/opt/postgresql@17/bin/psql -d postgres \
+  -c "CREATE ROLE postgres LOGIN PASSWORD 'dev';" \
+  -c "CREATE DATABASE punchlist OWNER postgres;"
+PGPASSWORD=dev /opt/homebrew/opt/postgresql@17/bin/psql -h localhost -U postgres \
+  -d punchlist -f backend/schema.sql
 ```
 
-`--mode server` loads `web/.env.server`, which sets `VITE_API_BASE=/api`. The
-composition root (`ServiceContainer.jsx`) then wires `HttpAnnotationRepository`,
-`HttpChangeLogRepository` and `HttpExportHistoryRepository` instead of the
-local-storage ones — all three together, so a markup's history never lives
-somewhere other than the markup. Set `API_TARGET` to proxy somewhere other than
-`localhost:8080`.
+### Every day
 
-If the server is down the app says so — *"The Punch List server at /api is not
-responding (502 Bad Gateway). Is the backend running?"* — rather than "Failed
-to fetch". A failed sealed-markups request throws instead of returning nothing,
-so an issued markup can never quietly become editable.
+```bash
+cd backend && go run .          # API on :8080
+cd web && npm run dev           # app on :5173 — /api is proxied to :8080
+```
 
-`npm run verify -- http` runs the repositories against a stand-in that mirrors
-`backend/main.go` and `backend/history.go`. It proves the app speaks the API's
-contract; only running the real server proves the Go code and Postgres do.
+### How it is wired
+
+`web/.env` sets `VITE_API_BASE=/api`; `web/.env.browser` (loaded by
+`npm run dev:browser`) clears it. The composition root (`ServiceContainer.jsx`)
+then wires either `HttpAnnotationRepository`, `HttpChangeLogRepository` and
+`HttpExportHistoryRepository`, or the local-storage ones — all three together,
+so a markup's history never lives somewhere other than the markup.
+`vite.config.js` proxies `/api` to `localhost:8080` (`API_TARGET` overrides). A
+production build calls `/api` on its own origin, so the deployed site must
+serve the API there (SCRUM-49).
+
+### Work saved in the browser before server mode is not lost
+
+In server mode the stores are wrapped in decorators (`domain/upload`) that, the
+first time a sheet or document is used, upload whatever this browser had saved
+for it: markups, their history and export records. The server's copy wins when
+both have the same markup, a markup deleted on the server stays deleted, and an
+issued markup stays locked. The browser copy is kept as a backup. A ledger in
+local storage (`punchlist.uploadedToServer`) records what is done, so it
+happens once; a failed upload is retried on the next read. Nothing that reads
+the stores knows the upload exists.
+
+### When the server is down
+
+The app says so — *"The Punch List server at /api is not responding (502 Bad
+Gateway). Is the backend running? To work without it, run
+`npm run dev:browser` instead."* The second sentence appears only in
+development. A failed sealed-markups request throws rather than returning
+nothing, so an issued markup can never quietly become editable.
+
+### Checks
+
+`npm run verify -- http` runs the repositories against a stand-in mirroring
+`backend/main.go` and `backend/history.go`; `npm run verify -- upload` covers
+the one-time upload. Both were also run end to end against the real Go server
+and Postgres (see PR #14).
 
 ## How to add pinch-zoom (Sprint 2)
 
