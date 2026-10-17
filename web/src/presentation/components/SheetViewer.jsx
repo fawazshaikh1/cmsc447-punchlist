@@ -155,6 +155,7 @@ export function SheetViewer({
         onToggleSource={() => setShowSource((on) => !on)}
         panelOpen={panelOpen}
         onTogglePanel={() => onPanelOpenChange(!panelOpen)}
+        isToolAvailable={editor.canUseTool}
       />
 
       {/* The stage and the panel are SIBLINGS of the rail, not nested inside a
@@ -245,7 +246,8 @@ export function SheetViewer({
           rotation={rotation}
           annotations={editor.annotations}
           selectedId={editor.selectedId}
-          onClear={editor.clearSheet}
+          // Offered only to a role that may delete markups (SCRUM-47).
+          onClear={editor.canClearSheet ? editor.clearSheet : undefined}
         />
       </aside>
 

@@ -329,16 +329,34 @@ check('RoleEditPolicy works off that same actor, with no other wiring', async ()
     role: 'collaborator',
   });
 
-  const { editor } = build({
+  const { editor, repository } = build({
     identity: new StaticIdentityProvider(collaborator),
     policy: new CompositeEditPolicy([new RoleEditPolicy()]),
   });
 
-  // A collaborator may add photos and comments...
-  await editor.add(pin('a', 'Scuff on wall'));
+  // Someone else's pin is already on the sheet.
+  await repository.save(pin('a', 'Scuff on wall'));
 
-  // ...but may not move, delete, or change status.
+  // A collaborator may add photos (and comments) — but not punch items.
+  const { PhotoMarkup } = await import('../src/domain/annotations/PhotoMarkup.js');
+  const { MediaRef } = await import('../src/domain/media/MediaRef.js');
+  await editor.add(
+    new PhotoMarkup(
+      'ph',
+      SHEET,
+      new PdfPoint(10, 10),
+      new MediaRef({ key: 'k', mimeType: 'image/jpeg', width: 100, height: 80 }),
+      'Patched',
+      120,
+      new Date('2026-09-18'),
+    ),
+  );
+  assert.equal(editor.canCreate('photo').allowed, true);
+  assert.equal(editor.canCreate('pin').code, 'role', 'the tool rail hides Pin for them');
+
+  // ...and may not move, delete, change status, or add a pin.
   for (const attempt of [
+    () => editor.add(pin('b', 'Another issue')),
     () => editor.move(pin('a'), 5, 5),
     () => editor.remove(pin('a')),
   ]) {

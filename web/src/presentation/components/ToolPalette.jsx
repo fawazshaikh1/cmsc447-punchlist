@@ -66,6 +66,7 @@ export function ToolPalette({
   onToggleSource,
   panelOpen,
   onTogglePanel,
+  isToolAvailable = () => true,
 }) {
   return (
     <nav className="tool-rail" aria-label="Markup tools">
@@ -116,7 +117,10 @@ export function ToolPalette({
       <div className="rail-divider" />
 
       <div role="radiogroup" aria-label="Markup tool" style={{ display: 'contents' }}>
-        {ToolRegistry.all().map((tool) => {
+        {/* Only the tools this person's role may use — a collaborator sees
+            Select and Photo. Asked through `isToolAvailable` so the rail holds
+            no rule about roles. */}
+        {ToolRegistry.all().filter(isToolAvailable).map((tool) => {
           const id = tool.getId();
           const isActive = id === activeToolId;
 

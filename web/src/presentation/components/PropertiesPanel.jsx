@@ -5,7 +5,9 @@ import { FlagNotices } from './FlagNotices';
 import { Icon } from './Icon';
 import { useConfirmation } from './ConfirmDialog';
 import { useCommitOnBlur } from './useCommitOnBlur';
-import { ClosingNotice, SealedNotice } from './SealingNotice';
+import { ClosingNotice } from './SealingNotice';
+import { LockNotice } from './LockNotice';
+import { hidesEditControls } from './hidesEditControls';
 
 /**
  * How much one press of the size buttons changes a markup.
@@ -119,6 +121,8 @@ export function PropertiesPanel({
   if (!annotation) return null;
 
   const readOnly = lock.denied;
+  // Disabled for an issued markup, absent for a role that cannot edit.
+  const hideEdits = hidesEditControls(lock);
   const canLabel = typeof annotation.withLabel === 'function';
   const canStatus = typeof annotation.withStatus === 'function';
   const canText = typeof annotation.withText === 'function';
@@ -172,7 +176,7 @@ export function PropertiesPanel({
         </button>
       </header>
 
-      {readOnly && <SealedNotice reason={lock.reason} />}
+      {readOnly && <LockNotice lock={lock} />}
 
       {/* Problems that are not tied to a specific input are shown together at
           the top. Field-level ones appear under their own control instead, so
@@ -274,7 +278,7 @@ export function PropertiesPanel({
       {/* Offered by CAPABILITY, like every other control here: `onResize` is
           passed only when the annotation implements `scaledBy`. A pin has no
           size, so no control appears and nothing had to know that. */}
-      {onResize && (
+      {onResize && !hideEdits && (
         <div className="field">
           Size
           <div className="size-control">
@@ -315,22 +319,26 @@ export function PropertiesPanel({
         </p>
       )}
 
-      <p className="muted small">
-        {readOnly
-          ? 'Add a new markup on top if something here still needs work.'
-          : onResize
-            ? 'Drag with the Select tool to reposition, or use the size buttons. Every change here is undoable.'
-            : 'Drag with the Select tool to reposition. Every change here is undoable.'}
-      </p>
+      {!hideEdits && (
+        <>
+          <p className="muted small">
+            {readOnly
+              ? 'Add a new markup on top if something here still needs work.'
+              : onResize
+                ? 'Drag with the Select tool to reposition, or use the size buttons. Every change here is undoable.'
+                : 'Drag with the Select tool to reposition. Every change here is undoable.'}
+          </p>
 
-      <button
-        type="button"
-        className="danger"
-        disabled={readOnly}
-        onClick={() => onDelete(annotation)}
-      >
-        Delete
-      </button>
+          <button
+            type="button"
+            className="danger"
+            disabled={readOnly}
+            onClick={() => onDelete(annotation)}
+          >
+            Delete
+          </button>
+        </>
+      )}
     </aside>
   );
 }
