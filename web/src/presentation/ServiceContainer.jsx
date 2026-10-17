@@ -11,6 +11,7 @@ import {
 import {
   ActiveSeals,
   CompositeEditPolicy,
+  RoleEditPolicy,
   SealedByExportPolicy,
 } from '../domain/policy';
 import { AnnotationService } from '../domain/services/AnnotationService';
@@ -31,6 +32,9 @@ import { HttpChangeLogRepository } from '../infrastructure/persistence/HttpChang
 import { HttpExportHistoryRepository } from '../infrastructure/persistence/HttpExportHistoryRepository';
 import { LocalStorageUploadLedger } from '../infrastructure/persistence/LocalStorageUploadLedger';
 import { CryptoIdGenerator } from '../infrastructure/identity/CryptoIdGenerator';
+import { SessionIdentityProvider } from '../infrastructure/identity/SessionIdentityProvider';
+import { HttpAccountRepository } from '../infrastructure/auth/HttpAccountRepository';
+import { HttpProjectRepository } from '../infrastructure/auth/HttpProjectRepository';
 
 /**
  * ===========================================================================
@@ -47,13 +51,11 @@ import { CryptoIdGenerator } from '../infrastructure/identity/CryptoIdGenerator'
  *   Without it they stay in this browser, so working on the frontend does
  *   not require Go and Postgres to be running.
  *
- *   Adding sign-in in Sprint 2 is exactly this diff:
- *       - new StaticIdentityProvider()
- *       + new SessionIdentityProvider('/api')
- *
- *   Switching roles on, once people have them, is exactly this — one more
- *   entry in the policy array below:
- *       + new RoleEditPolicy(),
+ *   Sign-in comes with the server (SCRUM-42 to 47). In server mode the
+ *   identity is the signed-in person on the open project
+ *   (SessionIdentityProvider instead of StaticIdentityProvider), and
+ *   RoleEditPolicy joins the permission model below. Browser mode has
+ *   neither: nobody signs in there.
  *
  *   Testing a component against fakes is exactly this:
  *       <ServiceContainer repository={new InMemoryAnnotationRepository()}>
@@ -122,12 +124,12 @@ export function ServiceContainer({
     const ids = new CryptoIdGenerator();
     const annotations = new AnnotationService(repo, ids);
 
-    // WHO IS WORKING. Anonymous today, because nobody signs in — see Actor for
-    // why that is a real object rather than null. Every write already asks this
-    // and every record already stores the answer, so Sprint 2 changes this one
-    // line and real names start appearing in logs that have been running since
-    // the beginning.
-    const who = identity ?? new StaticIdentityProvider();
+    // WHO IS WORKING. In server mode, the signed-in person on the project they
+    // opened — presentation/session sets the project once it is chosen. In
+    // browser mode nobody signs in, and the anonymous actor stands in (see
+    // Actor for why that is a real object rather than null). Every write
+    // already asks this and every record already stores the answer.
+    const who = identity ?? (api ? new SessionIdentityProvider(api) : new StaticIdentityProvider());
 
     // WHERE PHOTOGRAPHS LIVE. A separate store from annotations because the two
     // have nothing in common operationally — see MediaStore. Sprint 2 swaps
@@ -153,14 +155,13 @@ export function ServiceContainer({
     // reason a blocked user is shown first — the composite requires unanimous
     // consent regardless — so the most explanatory policy goes first.
     //
-    // RoleEditPolicy is written and takes no arguments: it reads the actor off
-    // the request, which EditorService has been supplying from `who` since the
-    // day it was written. It stays commented out because Actor.ANONYMOUS has no
-    // role, so enabling it before sign-in exists would correctly refuse
-    // everything.
+    // RoleEditPolicy reads the actor off the request, which EditorService
+    // supplies from `who`. Server mode only: in browser mode the actor is
+    // always anonymous, which has no role, and the policy would correctly
+    // refuse everything.
     const policy = new CompositeEditPolicy([
       new SealedByExportPolicy(() => activeSeals.ids),
-      // new RoleEditPolicy(),
+      ...(api ? [new RoleEditPolicy()] : []),
     ]);
 
     return {
@@ -183,6 +184,10 @@ export function ServiceContainer({
         media,
       }),
       identity: who,
+      // Signing in and choosing a project. Null in browser mode, which is how
+      // presentation/session knows there is nothing to sign in to.
+      accounts: api ? new HttpAccountRepository(api) : null,
+      projects: api ? new HttpProjectRepository(api) : null,
       // Both read directly by the editor hook. Exposed because they are domain
       // ports — the presentation layer depending on them is the dependency rule
       // working, not a leak.

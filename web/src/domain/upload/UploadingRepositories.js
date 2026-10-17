@@ -103,7 +103,7 @@ export class UploadingExportHistoryRepository extends ExportHistoryRepository {
   }
 
   async record(exportRecord) {
-    await this.uploads.ensureDocument(exportRecord.documentName);
+    await this.uploads.ensureDocument(exportRecord.documentName, Object.keys(exportRecord.annotationIdsBySheet)[0]);
     return this.inner.record(exportRecord);
   }
 
@@ -114,7 +114,7 @@ export class UploadingExportHistoryRepository extends ExportHistoryRepository {
 
   /** The hot one: asked every time a sheet opens. Seals must arrive first. */
   async sealedIdsForSheet(documentName, sheetId) {
-    await this.uploads.ensureDocument(documentName);
+    await this.uploads.ensureDocument(documentName, sheetId);
     return this.inner.sealedIdsForSheet(documentName, sheetId);
   }
 }
