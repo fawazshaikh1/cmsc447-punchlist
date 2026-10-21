@@ -53,6 +53,12 @@ func TestMain(m *testing.M) {
 		err = db.Ping(ctx)
 	}
 	if err != nil {
+		// In CI a missing database is a broken pipeline, not a reason to pass
+		// without testing anything.
+		if os.Getenv("REQUIRE_TEST_DATABASE") != "" {
+			fmt.Println("REQUIRE_TEST_DATABASE is set but the test database is unreachable:", err)
+			os.Exit(1)
+		}
 		skipReason = "no test database (createdb -O postgres punchlist_test): " + err.Error()
 		os.Exit(m.Run())
 	}
