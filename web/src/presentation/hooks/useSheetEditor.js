@@ -127,19 +127,22 @@ export function useSheetEditor({
     useCallback(() => activeSeals.ids, [activeSeals]),
   );
 
-  useEffect(() => {
+  /**
+   * Reads which markups on this sheet are sealed. Returns a cancel function:
+   * the user may change sheets while it is in flight, and applying a stale
+   * result would lock the wrong markups on the wrong drawing.
+   */
+  const loadSeals = useCallback(() => {
     let cancelled = false;
 
     if (!sheetId || !documentName) {
       activeSeals.replace([]);
-      return undefined;
+      return () => {};
     }
 
     void (async () => {
       try {
         const ids = await exportHistory.sealedIdsForSheet(documentName, sheetId);
-        // The user may have changed sheets while this was in flight. Applying a
-        // stale result would lock the wrong markups on the wrong drawing.
         if (!cancelled) activeSeals.replace(ids);
       } catch (cause) {
         // FAILING OPEN is the wrong answer, but it is the only one available:
@@ -160,6 +163,8 @@ export function useSheetEditor({
       cancelled = true;
     };
   }, [exportHistory, activeSeals, documentName, sheetId]);
+
+  useEffect(() => loadSeals(), [loadSeals]);
 
   /**
    * Whether a given markup may be changed, and why not.
@@ -238,6 +243,41 @@ export function useSheetEditor({
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // ---------------------------------------------------------------------------
+  // STAYING CURRENT
+  // ---------------------------------------------------------------------------
+  // On the server, teammates work on the same sheets. The sheet is read again
+  // — markups, attribution and seals — when the user comes back to the tab,
+  // and when they open the same drawing again, so a colleague's new photo or
+  // an item issued in the office appears without reloading the page. Never in
+  // the middle of a gesture: a drag or a half-drawn box is left alone.
+  const refresh = useCallback(() => {
+    if (draftRef.current || movingRef.current) return;
+    void reload();
+    loadSeals();
+  }, [reload, loadSeals]);
+
+  useEffect(() => {
+    const onReturn = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    window.addEventListener('focus', onReturn);
+    document.addEventListener('visibilitychange', onReturn);
+    return () => {
+      window.removeEventListener('focus', onReturn);
+      document.removeEventListener('visibilitychange', onReturn);
+    };
+  }, [refresh]);
+
+  // The same drawing opened again arrives as a new page on the same sheet id,
+  // which changes nothing the loaders above depend on — so it is noticed here.
+  const lastOpened = useRef({ page, sheetId });
+  useEffect(() => {
+    const previous = lastOpened.current;
+    lastOpened.current = { page, sheetId };
+    if (previous.page !== page && previous.sheetId === sheetId) refresh();
+  }, [page, sheetId, refresh]);
 
   /** Runs a mutation, then re-reads so the screen always matches storage. */
   const run = useCallback(
