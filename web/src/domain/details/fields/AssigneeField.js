@@ -19,6 +19,14 @@ export class AssigneeField extends TextItemField {
     return 'Optional — a person at that company';
   }
 
+  /**
+   * The project's people are offered first, so assigning someone means
+   * picking a teammate — spelled the way "Assigned to me" will match it.
+   */
+  getSuggestionSource() {
+    return 'people';
+  }
+
   /** "Set assigned to of pin" reads badly, so this one words its own change. */
   describeChange(value) {
     return value ? 'Assign' : 'Unassign';

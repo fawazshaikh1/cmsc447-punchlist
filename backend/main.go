@@ -76,6 +76,7 @@ func routes() http.Handler {
 	mux.HandleFunc("GET /api/projects/{projectID}/members", handleListMembers)
 	mux.HandleFunc("PUT /api/projects/{projectID}/members", handleSetMember)
 	mux.HandleFunc("DELETE /api/projects/{projectID}/members/{userID}", handleRemoveMember)
+	mux.HandleFunc("GET /api/projects/{projectID}/items", handleListProjectItems)
 
 	// Photos (media.go).
 	mux.HandleFunc("PUT /api/media/{key}", handlePutMedia)

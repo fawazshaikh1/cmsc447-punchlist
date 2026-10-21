@@ -804,3 +804,27 @@ func TestSessionsSurviveARestartOfTheServer(t *testing.T) {
 		t.Fatalf("session lost across restart: %d %+v", res.StatusCode, p)
 	}
 }
+
+func TestTheProjectPunchListCoversEveryDrawingAndOnlyThatProject(t *testing.T) {
+	tm := newTeam(t)
+	other := newTeam(t)
+	put := func(b *browser, id, sheetID string) {
+		expect(t, b.call("PUT", annotationPath(id), markup(id, sheetID, "pin")), 204, "put "+id)
+	}
+	put(tm.admin, "list-a1", sheet(tm.project, "A-101.pdf"))
+	put(tm.admin, "list-b1", fmt.Sprintf("p%d:B-201.pdf#3", tm.project))
+	put(other.admin, "list-x1", sheet(other.project, "A-101.pdf"))
+
+	var items []Annotation
+	r := tm.collab.call("GET", fmt.Sprintf("/api/projects/%d/items", tm.project), nil)
+	expect(t, r, 200, "a collaborator reads the project's punch list")
+	r.json(&items)
+	ids := []string{}
+	for _, a := range items {
+		ids = append(ids, a.ID)
+	}
+	if strings.Join(ids, ",") != "list-a1,list-b1" {
+		t.Fatalf("want both drawings of this project and nothing else, got %v", ids)
+	}
+	expect(t, tm.outsider.call("GET", fmt.Sprintf("/api/projects/%d/items", tm.project), nil), 403, "an outsider reads it")
+}

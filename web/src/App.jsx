@@ -223,6 +223,10 @@ export default function App() {
             panelOpen={panelOpen}
             onPanelOpenChange={setPanelOpen}
             onZoomTo={zoomTo}
+            pageIndex={pageIndex}
+            pageCount={pageCount}
+            sheetIdFor={sheetIdFor}
+            onSelectPage={(index) => void openPage(index)}
           />
         </div>
       ) : (

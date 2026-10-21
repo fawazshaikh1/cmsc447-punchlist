@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { usePinchZoom } from '../gestures/usePinchZoom';
+import { PunchListPanel } from '../punchlist/PunchListPanel';
 
 import { useServices } from '../ServiceContainer';
 import { useSheetEditor } from '../hooks/useSheetEditor';
@@ -32,6 +33,10 @@ export function SheetViewer({
   panelOpen,
   onPanelOpenChange,
   onZoomTo,
+  pageIndex = 0,
+  pageCount = 1,
+  sheetIdFor = () => sheetId,
+  onSelectPage = () => {},
 }) {
   // How a tool that declares `requiresText()` gets its text. Owned here rather
   // than inside the hook so the hook stays free of JSX and of any opinion about
@@ -100,6 +105,42 @@ export function SheetViewer({
   useEffect(() => {
     if (editor.error) onPanelOpenChange(true);
   }, [editor.error, onPanelOpenChange]);
+
+  // ---------------------------------------------------------------------------
+  // THE PANEL'S TWO VIEWS — the selected markup, or the punch list
+  // ---------------------------------------------------------------------------
+  // The list shows while nothing has happened that is about one markup: it
+  // remembers the selection and the error from when it was opened, and a
+  // different one — a markup tapped on the sheet, an item chosen in the list,
+  // an edit refused — brings the details back by itself.
+  const [listOpenedAt, setListOpenedAt] = useState(null);
+  const showList =
+    listOpenedAt !== null &&
+    listOpenedAt.selectedId === editor.selectedId &&
+    listOpenedAt.error === editor.error;
+  const openList = () => setListOpenedAt({ selectedId: editor.selectedId, error: editor.error });
+
+  // Going to an item from the list: change sheet if it is on another, select
+  // it once it is there, and bring it into view.
+  const scrollToSelection = useRef(false);
+  const goToItem = useCallback(
+    (item) => {
+      scrollToSelection.current = true;
+      editor.selectSoon(item.id);
+      if (item.pageIndex !== pageIndex) onSelectPage(item.pageIndex);
+    },
+    [editor, pageIndex, onSelectPage],
+  );
+  useEffect(() => {
+    if (!scrollToSelection.current || !editor.selectedId) return;
+    scrollToSelection.current = false;
+    const id = editor.selectedId;
+    requestAnimationFrame(() => {
+      stageRef.current
+        ?.querySelector(`[data-annotation-id="${CSS.escape(id)}"]`)
+        ?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
+    });
+  }, [editor.selectedId]);
 
   // Keyboard shortcuts. Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z are what every user
   // already has in their fingers; Delete removes the selection; Escape clears
@@ -202,7 +243,26 @@ export function SheetViewer({
           it back. */}
       <aside className="panel" hidden={!panelOpen}>
         <div className="panel-bar">
-          <span className="panel-bar-title">Details</span>
+          <div className="panel-tabs" role="tablist" aria-label="Side panel">
+            <button
+              type="button"
+              role="tab"
+              className="panel-tab"
+              aria-selected={!showList}
+              onClick={() => setListOpenedAt(null)}
+            >
+              Details
+            </button>
+            <button
+              type="button"
+              role="tab"
+              className="panel-tab"
+              aria-selected={showList}
+              onClick={openList}
+            >
+              Punch list
+            </button>
+          </div>
           <button
             type="button"
             className="icon-button"
@@ -214,51 +274,66 @@ export function SheetViewer({
           </button>
         </div>
 
-        {editor.error && (
-          <p className="error" style={{ margin: 12 }}>
-            {editor.error}
-          </p>
-        )}
-
-        {editor.selected ? (
-          <PropertiesPanel
-            annotation={editor.selected}
-            onUpdate={editor.update}
-            onDelete={editor.remove}
-            onClose={() => editor.select(null)}
-            // The panel is handed the DECISION, not the reason for it. It shows
-            // whatever explanation the policy gives, so when roles are switched
-            // on it renders those refusals correctly with no change here.
-            lock={editor.lockFor(editor.selected)}
-            // What is still missing, and who last touched it. Both are looked
-            // up through the service, so the panel renders them without knowing
-            // what a rule is or where attribution is stored.
-            problems={editor.problemsFor(editor.selected)}
-            lastChange={editor.lastChangeFor(editor.selected)}
-            // Passed only when the markup HAS a size, so the panel offers the
-            // control by capability rather than by checking a type.
-            onResize={editor.canResize(editor.selected) ? editor.resize : undefined}
-            peers={editor.annotations}
+        {/* Both views stay mounted, so the list keeps its filters and the
+            details keep a half-typed description while the other is shown. */}
+        <div hidden={!showList}>
+          <PunchListPanel
+            active={panelOpen && showList}
+            documentName={documentName}
+            pageCount={pageCount}
+            sheetIdFor={sheetIdFor}
+            changeKey={editor.annotations}
+            onGo={goToItem}
           />
-        ) : (
-          <div className="panel-empty">
-            <p className="small">
-              {editor.annotations.length === 0
-                ? 'No markups on this sheet yet. Pick a tool and tap the drawing.'
-                : 'Select a markup with the Select tool to edit it.'}
-            </p>
-          </div>
-        )}
+        </div>
 
-        <CoordinateInspector
-          page={page}
-          scale={scale}
-          rotation={rotation}
-          annotations={editor.annotations}
-          selectedId={editor.selectedId}
-          // Offered only to a role that may delete markups (SCRUM-47).
-          onClear={editor.canClearSheet ? editor.clearSheet : undefined}
-        />
+        <div hidden={showList}>
+          {editor.error && (
+            <p className="error" style={{ margin: 12 }}>
+              {editor.error}
+            </p>
+          )}
+
+          {editor.selected ? (
+            <PropertiesPanel
+              annotation={editor.selected}
+              onUpdate={editor.update}
+              onDelete={editor.remove}
+              onClose={() => editor.select(null)}
+              // The panel is handed the DECISION, not the reason for it. It shows
+              // whatever explanation the policy gives, so when roles are switched
+              // on it renders those refusals correctly with no change here.
+              lock={editor.lockFor(editor.selected)}
+              // What is still missing, and who last touched it. Both are looked
+              // up through the service, so the panel renders them without knowing
+              // what a rule is or where attribution is stored.
+              problems={editor.problemsFor(editor.selected)}
+              lastChange={editor.lastChangeFor(editor.selected)}
+              // Passed only when the markup HAS a size, so the panel offers the
+              // control by capability rather than by checking a type.
+              onResize={editor.canResize(editor.selected) ? editor.resize : undefined}
+              peers={editor.annotations}
+            />
+          ) : (
+            <div className="panel-empty">
+              <p className="small">
+                {editor.annotations.length === 0
+                  ? 'No markups on this sheet yet. Pick a tool and tap the drawing.'
+                  : 'Select a markup with the Select tool to edit it.'}
+              </p>
+            </div>
+          )}
+
+          <CoordinateInspector
+            page={page}
+            scale={scale}
+            rotation={rotation}
+            annotations={editor.annotations}
+            selectedId={editor.selectedId}
+            // Offered only to a role that may delete markups (SCRUM-47).
+            onClear={editor.canClearSheet ? editor.clearSheet : undefined}
+          />
+        </div>
       </aside>
 
       {!panelOpen && <PanelReveal onShow={() => onPanelOpenChange(true)} />}

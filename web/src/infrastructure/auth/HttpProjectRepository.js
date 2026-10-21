@@ -1,3 +1,4 @@
+import { AnnotationRegistry } from '../../domain/annotations/AnnotationRegistry';
 import { Member } from '../../domain/projects/Member';
 import { Project } from '../../domain/projects/Project';
 import { ProjectRepository } from '../../domain/ports/ProjectRepository';
@@ -11,6 +12,7 @@ import { HttpJsonClient } from '../persistence/HttpJsonClient';
  *   GET    /api/projects/{id}/members                 -> 200 [member]
  *   PUT    /api/projects/{id}/members   {email, role} -> 200 member
  *   DELETE /api/projects/{id}/members/{userId}        -> 204
+ *   GET    /api/projects/{id}/items                   -> 200 [annotation]
  */
 export class HttpProjectRepository extends ProjectRepository {
   /**
@@ -47,5 +49,11 @@ export class HttpProjectRepository extends ProjectRepository {
       'DELETE',
       `/projects/${HttpJsonClient.segment(projectId)}/members/${HttpJsonClient.segment(userId)}`,
     );
+  }
+
+  async items(projectId) {
+    const rows = await this.http.getJson(`/projects/${HttpJsonClient.segment(projectId)}/items`);
+    // A kind this build does not know is skipped, as everywhere else.
+    return rows.map((dto) => AnnotationRegistry.tryFromJSON(dto)).filter((annotation) => annotation !== null);
   }
 }

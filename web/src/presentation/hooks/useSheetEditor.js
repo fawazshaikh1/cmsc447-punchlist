@@ -209,6 +209,12 @@ export function useSheetEditor({
 
   // --- loading ------------------------------------------------------------
 
+  /**
+   * A markup to select as soon as it is on screen — chosen in the punch list,
+   * on a sheet that is still loading. Consumed by the load that brings it.
+   */
+  const selectWhenLoaded = useRef(null);
+
   const reload = useCallback(async () => {
     if (!sheetId) {
       setItems([]);
@@ -222,9 +228,15 @@ export function useSheetEditor({
       // Drop a selection whose annotation no longer exists — after an undo of
       // an add, or a delete. Leaving it would show a properties panel for
       // something that is not on the sheet.
-      setSelectedId((current) =>
-        current && loaded.some((a) => a.id === current) ? current : null,
-      );
+      const wanted = selectWhenLoaded.current;
+      if (wanted && loaded.some((a) => a.id === wanted)) {
+        selectWhenLoaded.current = null;
+        setSelectedId(wanted);
+      } else {
+        setSelectedId((current) =>
+          current && loaded.some((a) => a.id === current) ? current : null,
+        );
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       return;
@@ -534,6 +546,18 @@ export function useSheetEditor({
     selected,
     selectedId,
     select: setSelectedId,
+    /**
+     * Selects a markup now if it is on this sheet, or as soon as the sheet it
+     * is on has loaded — for going to an item from the punch list, which may
+     * change the sheet first.
+     */
+    selectSoon: useCallback(
+      (id) => {
+        if (items.some((a) => a.id === id)) setSelectedId(id);
+        else selectWhenLoaded.current = id;
+      },
+      [items],
+    ),
 
     tool,
     toolId: tool.getId(),

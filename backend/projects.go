@@ -392,3 +392,50 @@ func roleIn(ctx context.Context, tx pgx.Tx, userID, projectID int) (Role, error)
 	}
 	return Role(role), err
 }
+
+// GET /api/projects/{projectID}/items — every markup in the project, on every
+// drawing, for the punch list (SCRUM-32, SCRUM-52). Anyone on the project may
+// read it. Ordered by sheet and then as each sheet lists them, so numbering
+// them per drawing gives the same numbers the pins show.
+func handleListProjectItems(w http.ResponseWriter, r *http.Request) {
+	u, ok := signedIn(w, r)
+	if !ok {
+		return
+	}
+	projectID, ok := projectIDParam(w, r)
+	if !ok {
+		return
+	}
+	if _, ok := memberOf(w, r, u, projectID, false); !ok {
+		return
+	}
+	// The project is the sheet id's prefix (see access.go). "p1:" cannot
+	// match "p12:" — the colon ends the number.
+	rows, err := db.Query(r.Context(),
+		`SELECT id, sheet_id, kind, COALESCE(x, 0), COALESCE(y, 0), payload, created_at
+		 FROM annotations WHERE sheet_id LIKE $1
+		 ORDER BY sheet_id, created_at, id`,
+		"p"+strconv.Itoa(projectID)+":%")
+	if err != nil {
+		dbError(w, "list project items", err)
+		return
+	}
+	defer rows.Close()
+
+	list := []Annotation{}
+	for rows.Next() {
+		var a Annotation
+		var created time.Time
+		if err := rows.Scan(&a.ID, &a.SheetID, &a.Kind, &a.X, &a.Y, &a.Payload, &created); err != nil {
+			dbError(w, "scan project item", err)
+			return
+		}
+		a.CreatedAt = created.UTC().Format(time.RFC3339)
+		list = append(list, a)
+	}
+	if err := rows.Err(); err != nil {
+		dbError(w, "list project items rows", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, list)
+}

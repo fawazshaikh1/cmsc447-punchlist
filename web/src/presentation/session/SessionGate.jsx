@@ -1,4 +1,5 @@
 import { Icon } from '../components/Icon';
+import { ProjectPeople } from './ProjectPeople';
 import { ProjectPicker } from './ProjectPicker';
 import { SessionProvider } from './SessionProvider';
 import { SessionScreen } from './SessionScreen';
@@ -35,7 +36,11 @@ function Gate({ children }) {
     case SessionStatus.BROWSER:
       return children;
     case SessionStatus.READY:
-      return <Keyed key={session.project.id}>{children}</Keyed>;
+      return (
+        <Keyed key={session.project.id}>
+          <ProjectPeople projectId={session.project.id}>{children}</ProjectPeople>
+        </Keyed>
+      );
     case SessionStatus.SIGNED_OUT:
       return <SignInScreen />;
     case SessionStatus.CHOOSING_PROJECT:

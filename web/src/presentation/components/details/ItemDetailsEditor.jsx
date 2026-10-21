@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useContext, useEffect, useRef } from 'react';
 
 import { ItemFieldRegistry } from '../../../domain/details';
 import { FieldEditorRegistry } from './FieldEditorRegistry';
 import { ReadOnlyFieldEditor } from './ReadOnlyFieldEditor';
+import { SuggestionSourcesContext } from './SuggestionSources';
 
 /** Enough to cover a sheet's companies without turning a hint into a list to scroll. */
 const MAX_SUGGESTIONS = 40;
@@ -46,6 +47,8 @@ export function ItemDetailsEditor({ annotation, readOnly, onUpdate, peers = [] }
   useEffect(() => {
     latest.current = annotation;
   });
+  // Run-time suggestions — the project's people for "Assigned to".
+  const sources = useContext(SuggestionSourcesContext);
 
   const fields = ItemFieldRegistry.all();
   if (fields.length === 0) return null;
@@ -88,7 +91,7 @@ export function ItemDetailsEditor({ annotation, readOnly, onUpdate, peers = [] }
             field={field}
             value={annotation.details.get(field.getKey())}
             readOnly={readOnly}
-            suggestions={suggestionsFor(field, peers)}
+            suggestions={suggestionsFor(field, peers, sources[field.getSuggestionSource?.()] ?? [])}
             identity={annotation.id}
             onCommit={commitFor(field)}
           />
@@ -99,11 +102,12 @@ export function ItemDetailsEditor({ annotation, readOnly, onUpdate, peers = [] }
 }
 
 /**
- * Values already used on this sheet first — they are the ones this job
+ * The field's run-time source first (the project's people, for "Assigned
+ * to"), then values already used on this sheet — they are the ones this job
  * actually uses — then the field's own list, without repeats that differ only
  * in letter case.
  */
-function suggestionsFor(field, peers) {
+function suggestionsFor(field, peers, fromSource) {
   const key = field.getKey();
   const seen = new Set();
   const result = [];
@@ -115,6 +119,7 @@ function suggestionsFor(field, peers) {
     result.push(value);
   };
 
+  for (const value of fromSource) offer(value);
   for (const peer of peers) {
     if (typeof peer.details?.get === 'function') offer(peer.details.get(key));
   }
