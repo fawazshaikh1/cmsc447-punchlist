@@ -20,7 +20,12 @@ export function useSheetDocument() {
     page: null,
     pageCount: 0,
     pageIndex: 0,
+    // What the file is called — shown in the top bar.
     fileName: null,
+    // Which drawing it IS: its own name, or for a returned working copy the
+    // name of the drawing it was exported from. Sheets, seals and exports are
+    // all filed under this, so the copy and the original are one drawing.
+    documentName: null,
     // The File handle is retained so export can re-read the original bytes.
     // Caching the ArrayBuffer instead would NOT work: pdf.js detaches the
     // buffer it was given, so the cached copy is zero-length by the time the
@@ -62,7 +67,10 @@ export function useSheetDocument() {
         //
         // Any other PDF comes back as the very same buffer, untouched.
         const original = await file.arrayBuffer();
-        const { bytes } = await workingCopies.open(original, (index) => sheetIdFor(file.name, index));
+        const { bytes, documentName, failed } = await workingCopies.open(original, {
+          fileName: file.name,
+          sheetIdFor,
+        });
 
         // Export re-reads `sourceFile`, so it must hold the cleaned bytes too.
         // Built BEFORE pdf.js sees the buffer, because pdf.js detaches it.
@@ -77,9 +85,15 @@ export function useSheetDocument() {
           pageCount: loaded.getPageCount(),
           pageIndex: 0,
           fileName: file.name,
+          documentName,
           sourceFile,
           isLoading: false,
-          error: null,
+          // Not an error that stops anything — the drawing is open and every
+          // other markup is live — but the user must know some are not.
+          error:
+            failed > 0
+              ? `${failed} markup(s) in this file could not be brought back, so they are shown read-only.`
+              : null,
         });
       } catch (error) {
         documentRef.current = null;
@@ -88,6 +102,7 @@ export function useSheetDocument() {
           pageCount: 0,
           pageIndex: 0,
           fileName: file.name,
+          documentName: null,
           sourceFile: null,
           isLoading: false,
           error: error instanceof Error ? error.message : String(error),

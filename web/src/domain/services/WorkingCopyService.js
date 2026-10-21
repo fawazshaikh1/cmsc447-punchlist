@@ -1,14 +1,35 @@
 import { AnnotationRegistry } from '../annotations/AnnotationRegistry';
 import { NullChangeLog } from '../audit/NullChangeLog';
+import { documentNameOf } from '../documents/sheetNames';
 import { EditPolicy } from '../policy/EditPolicy';
 import { AnnotationRepository } from '../ports/AnnotationRepository';
 import { ChangeLogRepository } from '../ports/ChangeLogRepository';
 import { WorkingCopyReader } from '../ports/WorkingCopyReader';
+import { SheetScope } from '../projects/SheetScope';
 import { assertInstanceOf } from '../support/contracts';
 
 /**
  * Opening a PDF: brings back the markups a working copy carries, as live,
  * selectable markups, before the drawing is shown.
+ *
+ * ===========================================================================
+ * A RETURNED WORKING COPY IS THE SAME DRAWING
+ * ===========================================================================
+ * The working copy of `A-101.pdf` comes back from the architect as
+ * `A-101-marked-up.pdf`. It is opened AS `A-101.pdf`: its pages are that
+ * drawing's sheets, and its markups are the same markups, not copies of them.
+ * So on the server the punch items everyone else sees are the ones on screen,
+ * and an edit made here reaches them — rather than forking into a second set
+ * of items under a second file name that only this person ever opens.
+ *
+ * Which drawing a file came from is read from its markups: each one carries
+ * the sheet it was exported from. A file with none of our markups is its own
+ * drawing, under its own name.
+ *
+ * A copy opened in a DIFFERENT project is a copy: its markups get ids of
+ * their own there (the original id plus the project), so the two projects
+ * never touch each other's items, and reopening the file again finds the
+ * copies rather than making more.
  *
  * ===========================================================================
  * WHICH COPY WINS
@@ -62,15 +83,23 @@ export class WorkingCopyService {
 
   /**
    * @param {ArrayBuffer} bytes The PDF as the user opened it.
-   * @param {(pageIndex: number) => string} sheetIdFor The id each page has in
-   *        THIS file — never the id it had in the file it was exported from.
-   * @returns {Promise<{ bytes: ArrayBuffer, restored: number }>} The bytes to
-   *          view and export from, and how many markups became live.
+   * @param {object} naming
+   * @param {string} naming.fileName What the file is called on this device.
+   * @param {(documentName: string, pageIndex: number) => string} naming.sheetIdFor
+   *        How a page of a drawing is named here — scoped to the open project.
+   * @returns {Promise<{ bytes: ArrayBuffer, restored: number, failed: number, documentName: string }>}
+   *          The bytes to view and export from; how many markups became live;
+   *          how many could not be (they stay in the file, read-only); and the
+   *          drawing the file is — its own name, or the one it is a working
+   *          copy of.
    */
-  async open(bytes, sheetIdFor) {
+  async open(bytes, { fileName, sheetIdFor }) {
     /** @type {Map<string, Set<string>>} ids already stored, per sheet */
     const stored = new Map();
     let restored = 0;
+    let failed = 0;
+    /** Settled by the first markup the file hands over: see the class comment. */
+    let documentName = null;
 
     const storedOn = async (sheetId) => {
       if (!stored.has(sheetId)) {
@@ -82,28 +111,40 @@ export class WorkingCopyService {
 
     try {
       const view = await this.reader.read(bytes, async ({ pageIndex, data }) => {
-        const sheetId = sheetIdFor(pageIndex);
-        const annotation = rebuild(data, sheetId);
-        if (!annotation) return false;
+        // The first markup that names its drawing settles it for the rest; a
+        // damaged one before it must not decide where everything goes.
+        documentName ??= documentNameOf(data?.sheetId);
+        const sheetId = sheetIdFor(documentName ?? fileName, pageIndex);
 
-        const ids = await storedOn(sheetId);
-        if (ids.has(annotation.id)) return true;
-        if (await this.#wasDeleted(sheetId, annotation.id)) return true;
-        if (!(await this.#hasItsMedia(annotation))) return false;
+        // One markup that cannot be restored must not take the others down
+        // with it: it stays in the file, drawn read-only, and is counted.
+        try {
+          const annotation = rebuild(data, sheetId);
+          if (!annotation) return false;
 
-        await this.repository.save(annotation);
-        ids.add(annotation.id);
-        restored += 1;
-        return true;
+          const ids = await storedOn(sheetId);
+          if (ids.has(annotation.id)) return true;
+          if (await this.#wasDeleted(sheetId, annotation.id)) return true;
+          if (!(await this.#hasItsMedia(annotation))) return false;
+
+          await this.repository.save(annotation);
+          ids.add(annotation.id);
+          restored += 1;
+          return true;
+        } catch (error) {
+          console.warn('[punchlist] Could not restore a markup from this file.', error);
+          failed += 1;
+          return false;
+        }
       });
 
-      return { bytes: view, restored };
+      return { bytes: view, restored, failed, documentName: documentName ?? fileName };
     } catch (error) {
       // The drawing still opens. Restoring markups is a convenience layered on
       // top of opening a file; a PDF the reader chokes on must not become a
       // PDF the user cannot look at.
       console.warn('[punchlist] Could not restore markups from this file.', error);
-      return { bytes, restored };
+      return { bytes, restored, failed, documentName: documentName ?? fileName };
     }
   }
 
@@ -127,15 +168,25 @@ export class WorkingCopyService {
 }
 
 /**
- * The stored shape, re-homed onto this file's sheet. Null for anything that
- * cannot be rebuilt — an unregistered kind, or data that fails a constructor's
- * checks — because a bad markup must not stop the good ones loading.
+ * The stored shape, re-homed onto the sheet it opens on. Null for anything
+ * that cannot be rebuilt — an unregistered kind, or data that fails a
+ * constructor's checks — because a bad markup must not stop the good ones
+ * loading.
+ *
+ * Re-homed into a different project, it is a copy, and gets an id of its own
+ * there: ids are unique across a whole server, and the original still belongs
+ * to the project it came from. The new id is derived, not random, so opening
+ * the same file again finds the copy instead of making another.
  */
 function rebuild(data, sheetId) {
   if (!data || typeof data !== 'object') return null;
 
+  const from = SheetScope.projectOf(data.sheetId ?? '');
+  const to = SheetScope.projectOf(sheetId);
+  const id = from === to || typeof data.id !== 'string' ? data.id : `${data.id}~${to === null ? 'local' : `p${to}`}`;
+
   try {
-    return AnnotationRegistry.tryFromJSON({ ...data, sheetId });
+    return AnnotationRegistry.tryFromJSON({ ...data, id, sheetId });
   } catch {
     return null;
   }

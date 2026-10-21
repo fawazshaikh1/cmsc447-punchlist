@@ -49,7 +49,7 @@ import './presentation/components/markers';
  */
 export default function App() {
   const {
-    page, pageCount, pageIndex, fileName, sourceFile, isLoading, error, openFile, openPage,
+    page, pageCount, pageIndex, fileName, documentName, sourceFile, isLoading, error, openFile, openPage,
   } = useSheetDocument();
 
   const { scale, rotation, zoomIn, zoomOut, resetZoom, zoomTo, rotateClockwise } = useViewState();
@@ -73,22 +73,23 @@ export default function App() {
   // switching would write a stale annotation into the new document's storage.
   useEffect(() => {
     editor.reset();
-  }, [editor, fileName]);
+  }, [editor, documentName]);
 
-  // Identity for one sheet — see presentation/sheetIdentity for why it is
-  // derived from the file name. Passed to the exporter rather than assumed by
-  // it, because in Sprint 2 it becomes the sheet's real database id.
+  // Identity for one sheet — see domain/documents/sheetNames for why it is
+  // derived from the drawing's name. The DRAWING's, not the file's: a working
+  // copy that came back under another name is the same drawing, with the same
+  // sheets (see WorkingCopyService).
   const sheetIdFor = useCallback(
-    (index) => (fileName ? sheetIdOf(fileName, index) : null),
-    [fileName, sheetIdOf],
+    (index) => (documentName ? sheetIdOf(documentName, index) : null),
+    [documentName, sheetIdOf],
   );
 
   const sheetId = sheetIdFor(pageIndex);
 
   const runExport = useCallback(
     (flatten) =>
-      void exportDocument({ sourceFile, pageCount, sheetIdFor, author: 'Punch List', flatten }),
-    [exportDocument, sourceFile, pageCount, sheetIdFor],
+      void exportDocument({ sourceFile, documentName, pageCount, sheetIdFor, flatten }),
+    [exportDocument, sourceFile, documentName, pageCount, sheetIdFor],
   );
 
   const handleExport = useCallback(() => runExport(false), [runExport]);
@@ -165,6 +166,7 @@ export default function App() {
 
       <Toolbar
         fileName={fileName}
+        documentName={documentName}
         pageCount={pageCount}
         pageIndex={pageIndex}
         scale={scale}
@@ -208,7 +210,7 @@ export default function App() {
         <div className={panelOpen ? 'app-body' : 'app-body no-panel'}>
           <SheetViewer
             sheetId={sheetId}
-            documentName={fileName}
+            documentName={documentName}
             page={page}
             scale={scale}
             rotation={rotation}
