@@ -50,6 +50,11 @@ export class InkMarkup extends Annotation {
     return INK_KIND;
   }
 
+  /** Made with the Draw tool; "drawing" already means the sheet itself. */
+  getTypeName() {
+    return 'sketch';
+  }
+
   /** Anchor is the first point of the stroke. @returns {PdfPoint} */
   getAnchor() {
     return this.points[0];

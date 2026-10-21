@@ -169,7 +169,7 @@ export function PropertiesPanel({
       {dialog}
 
       <header className="properties-header">
-        <strong>{annotation.getKind()}</strong>
+        <strong>{annotation.getTypeName()}</strong>
         <span className="muted">{annotation.createdAt.toLocaleString()}</span>
         <button type="button" className="icon" aria-label="Close" onClick={onClose}>
           ×

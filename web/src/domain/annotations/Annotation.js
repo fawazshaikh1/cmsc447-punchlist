@@ -61,6 +61,19 @@ export class Annotation {
   }
 
   /**
+   * What this kind of markup is called on screen — "Add box", "Move sketch",
+   * the properties panel's title. The kind is an id for storage and the
+   * registries, and three of them are not the word a person uses (the Box
+   * tool makes a `rectangle`). Defaults to the kind; a subclass whose kind
+   * reads wrongly overrides it.
+   *
+   * @returns {string} Lower case, as it appears mid-sentence.
+   */
+  getTypeName() {
+    return this.getKind();
+  }
+
+  /**
    * The single point this annotation hangs from, in PDF user space.
    *
    * For a pin this is the pin tip. For a rectangle it will be one corner, with

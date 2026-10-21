@@ -66,7 +66,13 @@ export default function App() {
   // because the `.app-body` grid needs it too, to give the stage the panel's
   // column back. Hiding it matters most at tablet width, where the panel slides
   // over the drawing instead of sitting beside it.
-  const [panelOpen, setPanelOpen] = useState(true);
+  //
+  // It STARTS hidden where it would slide over the drawing (900px and below,
+  // matching the stylesheet): on a phone it covered the whole sheet, so the
+  // first thing anyone saw of a drawing was a panel. "Details" brings it in.
+  const [panelOpen, setPanelOpen] = useState(
+    () => !globalThis.matchMedia?.('(max-width: 900px)').matches,
+  );
 
   // Discard undo history when a different drawing is opened. Commands hold
   // references to the previous document's annotations, and undoing one after

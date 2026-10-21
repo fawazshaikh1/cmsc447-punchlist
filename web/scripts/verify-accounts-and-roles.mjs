@@ -170,7 +170,7 @@ check('a collaborator adds photos and comments, and nothing else', () => {
     assert.equal(editor.canEdit(pin('a'), intent).code, 'role', intent);
   }
   assert.equal(editor.canIssue().code, 'role', 'issuing locks markups — not for collaborators');
-  assert.equal(editor.canClearSheet().code, 'role', 'no Clear pins for them either');
+  assert.equal(editor.canClearSheet().code, 'role', 'no Clear sheet for them either');
   assert.equal(editorFor(actor(ProjectRole.POWER_COLLABORATOR)).canClearSheet().allowed, true);
 });
 

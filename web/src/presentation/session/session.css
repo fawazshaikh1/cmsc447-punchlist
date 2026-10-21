@@ -311,8 +311,10 @@
   font-size: 12px;
 }
 
-/* At tablet width the top bar is already full; the avatar alone is enough. */
-@media (max-width: 1100px) {
+/* The project's name beside the avatar only where the bar has room for it
+   AND the drawing's name. Below that the avatar alone — the menu it opens
+   names both the person and the project. */
+@media (max-width: 1439px) {
   .session-menu-text {
     display: none;
   }

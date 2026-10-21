@@ -53,6 +53,11 @@ export class TextMarkup extends Annotation {
     return TEXT_KIND;
   }
 
+  /** What the Text tool asks for — "Add a callout". */
+  getTypeName() {
+    return 'callout';
+  }
+
   /** @returns {PdfPoint} */
   getAnchor() {
     return this.position;
