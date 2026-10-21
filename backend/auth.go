@@ -90,10 +90,15 @@ func (u *User) profile() Profile {
 	}
 }
 
-// migrate brings an existing database up to what sign-in needs.
+// migrate brings an existing database up to what the server needs: sign-in
+// (auth_schema.sql), then photos (media_schema.sql). Each is idempotent.
 func migrate(ctx context.Context) error {
-	_, err := db.Exec(ctx, authSchema)
-	return err
+	for _, schema := range []string{authSchema, mediaSchema} {
+		if _, err := db.Exec(ctx, schema); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // --- responses ---------------------------------------------------------------

@@ -7,6 +7,7 @@ import {
   UploadingAnnotationRepository,
   UploadingChangeLogRepository,
   UploadingExportHistoryRepository,
+  UploadingMediaStore,
 } from '../domain/upload';
 import {
   ActiveSeals,
@@ -20,6 +21,7 @@ import { ExportService } from '../domain/services/ExportService';
 import { WorkingCopyService } from '../domain/services/WorkingCopyService';
 import { PdfJsDocumentSource } from '../infrastructure/pdf/PdfJsDocumentSource';
 import { IndexedDbMediaStore } from '../infrastructure/media/IndexedDbMediaStore';
+import { HttpMediaStore } from '../infrastructure/media/HttpMediaStore';
 import { CanvasImageProcessor } from '../infrastructure/media/CanvasImageProcessor';
 import { MediaUrlCache } from './media/MediaUrlCache';
 import { PdfLibSheetExporter, FlattenedSheetExporter } from '../infrastructure/export';
@@ -132,9 +134,18 @@ export function ServiceContainer({
     const who = identity ?? (api ? new SessionIdentityProvider(api) : new StaticIdentityProvider());
 
     // WHERE PHOTOGRAPHS LIVE. A separate store from annotations because the two
-    // have nothing in common operationally — see MediaStore. Sprint 2 swaps
-    // this one line for `new S3MediaStore('/api')`.
-    const media = mediaStore ?? new IndexedDbMediaStore();
+    // have nothing in common operationally — see MediaStore. On the server in
+    // server mode (SCRUM-45), filed under the open project, with photos this
+    // browser took earlier uploaded the first time they are shown; in this
+    // browser otherwise.
+    const media =
+      mediaStore ??
+      (api
+        ? new UploadingMediaStore(
+            new HttpMediaStore(api, { projectOf: () => who.projectId ?? null }),
+            new IndexedDbMediaStore(),
+          )
+        : new IndexedDbMediaStore());
     const imageProcessor = new CanvasImageProcessor();
 
     // Object URLs, created once per photo and revoked together. Held here
