@@ -252,8 +252,10 @@ check('other errors keep the server’s sentence and their status; plain ones re
 });
 
 check('accounts: signed out is an answer, not an error — but a dead server is an error', async () => {
-  const out = new HttpAccountRepository('/api', fakeFetch(() => json(401, { error: 'Sign in to continue.' })).fn);
-  assert.equal(await out.current(), null);
+  const out = new HttpAccountRepository('/api', fakeFetch(() => json(200, null)).fn);
+  assert.equal(await out.current(), null, '200 null — no error in the console on every visit');
+  const older = new HttpAccountRepository('/api', fakeFetch(() => json(401, { error: 'Sign in to continue.' })).fn);
+  assert.equal(await older.current(), null, 'a 401 still reads as signed out');
 
   const down = new HttpAccountRepository('/api', fakeFetch(() => new Response(null, { status: 502, statusText: 'Bad Gateway' })).fn);
   await assert.rejects(() => down.current(), /not responding \(502 Bad Gateway\)/);

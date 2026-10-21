@@ -160,6 +160,27 @@ func expect(t *testing.T, r reply, status int, what string) {
 	}
 }
 
+// signedOutOf reports whether /api/auth/me says nobody is signed in: 200 null.
+func signedOutOf(t *testing.T, b *browser, what string) {
+	t.Helper()
+	r := b.call("GET", "/api/auth/me", nil)
+	if r.status != 200 || strings.TrimSpace(string(r.body)) != "null" {
+		t.Fatalf("%s: want 200 null from /api/auth/me, got %d %s", what, r.status, strings.TrimSpace(string(r.body)))
+	}
+}
+
+// signedInTo reports whether /api/auth/me names an account.
+func signedInTo(t *testing.T, b *browser, what string) Profile {
+	t.Helper()
+	r := b.call("GET", "/api/auth/me", nil)
+	var p Profile
+	r.json(&p)
+	if r.status != 200 || p.ID == "" {
+		t.Fatalf("%s: want a signed-in profile from /api/auth/me, got %d %s", what, r.status, strings.TrimSpace(string(r.body)))
+	}
+	return p
+}
+
 var emailCounter atomic.Int64
 
 func uniqueEmail(name string) string {
@@ -257,7 +278,7 @@ func TestRegisterSignsInAndNormalisesEmail(t *testing.T) {
 		t.Error("plain-http development must not get a Secure cookie, or sign-in silently fails there")
 	}
 
-	expect(t, b.call("GET", "/api/auth/me", nil), 200, "signed in straight after registering")
+	signedInTo(t, b, "signed in straight after registering")
 }
 
 func TestRegisterRefusesBadInput(t *testing.T) {
@@ -301,25 +322,25 @@ func TestLoginLogoutAndTheSameAnswerForUnknownAccounts(t *testing.T) {
 	if wrong.errorText() != unknown.errorText() {
 		t.Fatalf("unknown and wrong must read the same: %q vs %q", wrong.errorText(), unknown.errorText())
 	}
-	expect(t, b.call("GET", "/api/auth/me", nil), 401, "still signed out")
+	signedOutOf(t, b, "still signed out")
 
 	r := b.call("POST", "/api/auth/login", map[string]string{"email": strings.ToUpper(owner.user.Email), "password": goodPassword})
 	expect(t, r, 200, "login, email in capitals")
-	expect(t, b.call("GET", "/api/auth/me", nil), 200, "me after login")
+	signedInTo(t, b, "me after login")
 
 	// Grab the cookie value so it can be replayed after logout.
 	u, _ := url.Parse(server.URL + "/api")
 	stolen := b.client.Jar.Cookies(u)
 
 	expect(t, b.call("POST", "/api/auth/logout", nil), 204, "logout")
-	expect(t, b.call("GET", "/api/auth/me", nil), 401, "me after logout")
+	signedOutOf(t, b, "me after logout")
 
 	replay := newBrowser(t)
 	replay.client.Jar.SetCookies(u, stolen)
-	expect(t, replay.call("GET", "/api/auth/me", nil), 401, "a signed-out cookie is dead on the server, not just deleted in the browser")
+	signedOutOf(t, replay, "a signed-out cookie is dead on the server, not just deleted in the browser")
 
 	// The other browser the owner signed in on is unaffected.
-	expect(t, owner.call("GET", "/api/auth/me", nil), 200, "other sessions survive one logout")
+	signedInTo(t, owner, "other sessions survive one logout")
 }
 
 func TestTamperedAndExpiredSessionsAreRefused(t *testing.T) {
@@ -328,7 +349,7 @@ func TestTamperedAndExpiredSessionsAreRefused(t *testing.T) {
 
 	forged := newBrowser(t)
 	forged.client.Jar.SetCookies(u, []*http.Cookie{{Name: sessionCookie, Value: "made-up-token", Path: "/api"}})
-	expect(t, forged.call("GET", "/api/auth/me", nil), 401, "forged cookie")
+	signedOutOf(t, forged, "forged cookie")
 
 	_, err := db.Exec(context.Background(),
 		`UPDATE sessions SET expires_at = now() - interval '1 minute'
@@ -336,7 +357,7 @@ func TestTamperedAndExpiredSessionsAreRefused(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	expect(t, b.call("GET", "/api/auth/me", nil), 401, "expired session")
+	signedOutOf(t, b, "expired session")
 }
 
 func TestStoredSessionIsADigestNotTheCookie(t *testing.T) {
@@ -776,8 +797,10 @@ func TestSessionsSurviveARestartOfTheServer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	res.Body.Close()
-	if res.StatusCode != 200 {
-		t.Fatalf("session lost across restart: %d", res.StatusCode)
+	defer res.Body.Close()
+	var p Profile
+	_ = json.NewDecoder(res.Body).Decode(&p)
+	if res.StatusCode != 200 || p.ID != b.user.ID {
+		t.Fatalf("session lost across restart: %d %+v", res.StatusCode, p)
 	}
 }

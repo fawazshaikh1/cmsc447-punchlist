@@ -449,10 +449,20 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// GET /api/auth/me
+// GET /api/auth/me — the signed-in account, or null.
+//
+// "Nobody" is an ordinary answer to "who am I?", asked every time the app
+// starts, so it is a 200 with null rather than a 401: a 401 here is logged by
+// the browser as an error on every visit to the sign-in screen. Every other
+// endpoint still answers 401 without a session.
 func handleMe(w http.ResponseWriter, r *http.Request) {
-	u, ok := signedIn(w, r)
-	if !ok {
+	u, err := currentUser(r)
+	if errors.Is(err, errNotSignedIn) {
+		writeJSON(w, http.StatusOK, nil)
+		return
+	}
+	if err != nil {
+		dbError(w, "current user", err)
 		return
 	}
 	writeJSON(w, http.StatusOK, u.profile())
