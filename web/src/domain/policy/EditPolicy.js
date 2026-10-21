@@ -2,8 +2,11 @@ import { enforceContract, abstractMethod } from '../support/contracts';
 
 /**
  * @typedef {object} EditRequest
- * @property {import('../annotations/Annotation').Annotation} annotation
- *           What the user is trying to change.
+ * @property {import('../annotations/Annotation').Annotation|null} annotation
+ *           What the user is trying to change. Null when the question is
+ *           asked before a markup exists — "may I create one of these?" — in
+ *           which case `kind` says what would be created.
+ * @property {string} [kind] The kind of markup, when there is no annotation.
  * @property {string} intent  What they are trying to do — one of the INTENT
  *           constants below. Policies branch on this, so a future rule like
  *           "a collaborator may comment but not move" needs no new plumbing.
@@ -52,6 +55,9 @@ export class EditPolicy {
     DELETE: 'delete',
     STATUS: 'status',
     COMMENT: 'comment',
+    // Issuing a flattened PDF, which makes every markup in it permanent. Asked
+    // with no annotation: it is a decision about the sheet, not one markup.
+    ISSUE: 'issue',
   });
 
   constructor() {

@@ -166,6 +166,21 @@ export class AnnotationTool {
   }
 
   /**
+   * The kind of markup this tool makes, or null for a tool that makes none.
+   *
+   * Asked so the interface can offer only the tools the signed-in person may
+   * use — a collaborator sees Photo but not Pin — without a list of tool names
+   * anywhere outside the permission table. Every drawing tool's id is the kind
+   * it creates, so the default is right for all of them; a tool that ever
+   * differs overrides this.
+   *
+   * @returns {string|null}
+   */
+  createsKind() {
+    return this.isSelection() ? null : this.getId();
+  }
+
+  /**
    * @param {DraftRequest} request
    * @returns {import('../annotations/Annotation').Annotation}
    */

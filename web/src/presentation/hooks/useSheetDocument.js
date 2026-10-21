@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useServices } from '../ServiceContainer';
-import { sheetIdFor } from '../sheetIdentity';
+import { useSheetIdentity } from '../session/useSheetIdentity';
 
 /**
  * Owns the lifecycle of a loaded PDF: opening a file, selecting a page, and
@@ -12,6 +12,9 @@ import { sheetIdFor } from '../sheetIdentity';
  */
 export function useSheetDocument() {
   const { documents, workingCopies } = useServices();
+  // Inside the open project, so a reopened working copy's markups land on
+  // that project's sheets — see SheetScope.
+  const sheetIdFor = useSheetIdentity();
 
   const [state, setState] = useState({
     page: null,
@@ -91,7 +94,7 @@ export function useSheetDocument() {
         });
       }
     },
-    [documents, workingCopies],
+    [documents, workingCopies, sheetIdFor],
   );
 
   // Dispose on unmount. pdf.js keeps a worker alive per document; without this,

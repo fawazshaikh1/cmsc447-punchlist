@@ -32,8 +32,12 @@ import { Icon } from './Icon';
  * @param {() => void} props.onResetZoom
  * @param {() => void} props.onRotate
  * @param {() => void} [props.onExport] Omitted when no document is open.
- * @param {() => void} [props.onExportFlat]
+ * @param {() => void} [props.onExportFlat] Omitted when the signed-in role may
+ *        not issue a flattened PDF, which hides the button.
  * @param {boolean} [props.isExporting]
+ * @param {React.ReactNode} [props.children] Shown at the end of the bar —
+ *        the account menu in server mode. A slot, so what sits there is the
+ *        app shell's choice and this component needs no edit to change it.
  */
 export function Toolbar({
   fileName,
@@ -50,6 +54,7 @@ export function Toolbar({
   onExport,
   onExportFlat,
   isExporting,
+  children,
 }) {
   const handleFileChange = (event) => {
     const file = event.target.files?.[0];
@@ -179,18 +184,22 @@ export function Toolbar({
               <span className="btn-label">{isExporting ? 'Exporting…' : 'Working copy'}</span>
             </button>
 
-            <button
-              type="button"
-              className="btn primary"
-              onClick={onExportFlat}
-              disabled={isExporting}
-              title="Paints every markup into the drawing. Guaranteed to appear in any viewer — and makes those markups permanent."
-            >
-              <Icon name="lock" size={18} />
-              <span className="btn-label">{isExporting ? 'Exporting…' : 'Issue PDF'}</span>
-            </button>
+            {onExportFlat && (
+              <button
+                type="button"
+                className="btn primary"
+                onClick={onExportFlat}
+                disabled={isExporting}
+                title="Paints every markup into the drawing. Guaranteed to appear in any viewer — and makes those markups permanent."
+              >
+                <Icon name="lock" size={18} />
+                <span className="btn-label">{isExporting ? 'Exporting…' : 'Issue PDF'}</span>
+              </button>
+            )}
           </div>
         )}
+
+        {children}
       </div>
     </header>
   );

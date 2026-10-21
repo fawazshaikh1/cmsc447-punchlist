@@ -1,3 +1,6 @@
+import { EditDecision } from '../../domain/policy/EditDecision';
+import { EditNotPermittedError } from '../../domain/policy/EditNotPermittedError';
+
 /**
  * The few lines every HTTP repository needs, written once. TIER 3.
  *
@@ -66,6 +69,27 @@ export class HttpJsonClient {
   }
 
   /**
+   * Any method, with an optional JSON body, answering with the parsed JSON
+   * response — or null for an empty one (204).
+   *
+   * @param {string} method
+   * @param {string} path
+   * @param {unknown} [body]
+   * @returns {Promise<any>}
+   */
+  async sendJson(method, path, body) {
+    const init = { method };
+    if (body !== undefined) {
+      init.headers = { 'Content-Type': 'application/json' };
+      init.body = JSON.stringify(body);
+    }
+    const response = await this.request(path, init);
+    if (response.status === 204) return null;
+    const text = await response.text();
+    return text ? JSON.parse(text) : null;
+  }
+
+  /**
    * @param {string} path Starts with '/', relative to the base.
    * @param {RequestInit} [init]
    * @param {number[]} [tolerate] Statuses treated as success.
@@ -74,7 +98,14 @@ export class HttpJsonClient {
   async request(path, init = {}, tolerate = []) {
     let response;
     try {
-      response = await this.fetchFn(`${this.baseUrl}${path}`, init);
+      response = await this.fetchFn(`${this.baseUrl}${path}`, {
+        ...init,
+        // Every request says it comes from this app. The server refuses a
+        // change without it — another site cannot add a custom header without
+        // the server's consent, so this is what stops a malicious page from
+        // acting with the signed-in person's cookie (see backend/access.go).
+        headers: { ...init.headers, 'X-Punchlist-Request': '1' },
+      });
     } catch (cause) {
       throw new Error(
         `Cannot reach the Punch List server at ${this.baseUrl || '/'}. Is the backend running?${DEV_HINT}`,
@@ -93,10 +124,55 @@ export class HttpJsonClient {
             DEV_HINT,
         );
       }
-      throw new Error(
-        `${init.method ?? 'GET'} ${path.split('?')[0]} failed: ${response.status} ${response.statusText}`.trim(),
+      // The server explains refusals in a sentence meant for the person —
+      // "Your role on this project does not allow that change." — and that
+      // sentence is far more useful in the banner than "403 Forbidden".
+      const explained = await serverMessage(response);
+
+      // A refusal is the server's half of the permission model, so it arrives
+      // as the same error the client-side policy throws — callers that already
+      // handle "not permitted" need nothing new, and the upload of browser
+      // data can tell "not allowed" (final) from "server down" (try again).
+      if (response.status === 403) {
+        const refused = new EditNotPermittedError(
+          EditDecision.deny(explained ?? 'The server refused that change.', 'server'),
+        );
+        refused.status = 403;
+        throw refused;
+      }
+
+      throw new HttpError(
+        explained ??
+          `${init.method ?? 'GET'} ${path.split('?')[0]} failed: ${response.status} ${response.statusText}`.trim(),
+        response.status,
       );
     }
     return response;
+  }
+}
+
+/**
+ * A request the server answered with an error. `status` lets a caller tell
+ * "sign in again" (401) from "not allowed" (403) without parsing the message.
+ */
+export class HttpError extends Error {
+  /** @param {string} message @param {number} status */
+  constructor(message, status) {
+    // `name` is left as Error's own, so the message reads exactly as an
+    // ordinary Error would anywhere it is printed.
+    super(message);
+    this.status = status;
+  }
+}
+
+/** The `{"error": "..."}` message from a JSON error response, if there is one. */
+async function serverMessage(response) {
+  const type = response.headers?.get?.('Content-Type') ?? '';
+  if (!type.includes('application/json')) return null;
+  try {
+    const body = await response.json();
+    return typeof body?.error === 'string' && body.error ? body.error : null;
+  } catch {
+    return null;
   }
 }

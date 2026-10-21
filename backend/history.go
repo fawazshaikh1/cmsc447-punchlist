@@ -219,11 +219,16 @@ func appendExport(w http.ResponseWriter, r *http.Request) {
 		e.AnnotationIDsBySheet = json.RawMessage("{}")
 	}
 
+	// The project was worked out from the record's sheets by guardExports.
+	var projectID *int
+	if c := callerOf(r.Context()); c != nil && c.ProjectID != 0 {
+		projectID = &c.ProjectID
+	}
 	_, err = db.Exec(r.Context(),
-		`INSERT INTO export_history (id, document_name, mode, exported_at, exported_by, annotation_ids_by_sheet)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO export_history (id, document_name, mode, exported_at, exported_by, annotation_ids_by_sheet, project_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 ON CONFLICT (id) DO NOTHING`,
-		e.ID, e.DocumentName, e.Mode, at, e.ExportedBy, []byte(e.AnnotationIDsBySheet))
+		e.ID, e.DocumentName, e.Mode, at, e.ExportedBy, []byte(e.AnnotationIDsBySheet), projectID)
 	if err != nil {
 		dbError(w, "append export", err)
 		return
@@ -237,10 +242,19 @@ func listExports(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "document query parameter is required", http.StatusBadRequest)
 		return
 	}
+	// Only exports from projects the caller is on: two projects can both
+	// have a "Drawings.pdf", and neither should see the other's history.
+	caller := callerOf(r.Context())
+	if caller == nil {
+		http.Error(w, "sign in required", http.StatusUnauthorized)
+		return
+	}
 	rows, err := db.Query(r.Context(),
 		`SELECT id, document_name, mode, exported_at, exported_by, annotation_ids_by_sheet
-		 FROM export_history WHERE document_name = $1
-		 ORDER BY exported_at DESC, id DESC`, doc)
+		 FROM export_history
+		 WHERE document_name = $1
+		   AND project_id IN (SELECT project_id FROM memberships WHERE user_id = $2)
+		 ORDER BY exported_at DESC, id DESC`, doc, caller.User.ID)
 	if err != nil {
 		dbError(w, "list exports", err)
 		return

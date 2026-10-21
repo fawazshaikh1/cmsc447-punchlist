@@ -43,17 +43,41 @@ func main() {
 	}
 	log.Println("connected to database")
 
+	if err := migrate(context.Background()); err != nil {
+		log.Fatalf("cannot apply auth_schema.sql: %v", err)
+	}
+
+	log.Println("server running on :8080")
+	log.Fatal(http.ListenAndServe(":8080", routes()))
+}
+
+// routes is every endpoint, wrapped. Separate from main so the tests run
+// against exactly what the server serves.
+func routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-	mux.HandleFunc("/api/sheets/", handleSheets)
-	mux.HandleFunc("/api/exports", handleExports)
-	mux.HandleFunc("/api/exports/sealed", handleSealedIds)
-	mux.HandleFunc("/api/annotations/", handleSingleAnnotation)
+	// Markups, history and exports: every request needs a session and a role
+	// on the sheet's project. See access.go.
+	mux.HandleFunc("/api/sheets/", guardSheets(handleSheets))
+	mux.HandleFunc("/api/exports", guardExports(handleExports))
+	mux.HandleFunc("/api/exports/sealed", guardSealed(handleSealedIds))
+	mux.HandleFunc("/api/annotations/", guardAnnotation(handleSingleAnnotation))
 
-	log.Println("server running on :8080")
-	log.Fatal(http.ListenAndServe(":8080", withCORS(mux)))
+	// Accounts (auth.go) and projects (projects.go).
+	mux.HandleFunc("POST /api/auth/register", handleRegister)
+	mux.HandleFunc("POST /api/auth/login", handleLogin)
+	mux.HandleFunc("POST /api/auth/logout", handleLogout)
+	mux.HandleFunc("GET /api/auth/me", handleMe)
+	mux.HandleFunc("GET /api/session", handleSession)
+	mux.HandleFunc("GET /api/projects", handleListProjects)
+	mux.HandleFunc("POST /api/projects", handleCreateProject)
+	mux.HandleFunc("GET /api/projects/{projectID}/members", handleListMembers)
+	mux.HandleFunc("PUT /api/projects/{projectID}/members", handleSetMember)
+	mux.HandleFunc("DELETE /api/projects/{projectID}/members/{userID}", handleRemoveMember)
+
+	return withCORS(requireAppRequest(mux))
 }
 
 func withCORS(next http.Handler) http.Handler {
