@@ -4,9 +4,9 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-09-23 (later)
-**Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go · PostgreSQL · AWS (S3, RDS)
-**Codebase:** 127 source files, ~13,759 lines
+**Last updated:** 2026-10-21 — Sprint 2 wrap-up
+**Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go + pgx · PostgreSQL 17 · AWS (S3, RDS) planned
+**Codebase:** 221 source files, ~27,450 lines (app and server)
 
 ---
 
@@ -26,11 +26,11 @@ easy to write.
 | **Issued markups become read-only** | **Done** | `npm run verify:sealing` (10/10) + browser: 6 pins locked, survived reload |
 | **Confirmation before closing an item** | **Done** | Dialog shown; status stays Open until confirmed |
 | **Confirmation before issuing a flattened PDF** | **Done** | "6 markups on 1 sheet will become permanent" |
-| **Permission seam for roles** | **Ready, not wired** | `RoleEditPolicy` written; verify script proves a new policy needs no edits |
+| **Roles per project** (admin · power collaborator · collaborator) | **Done** | Browser hides what a role cannot do; the server refuses it (`access.go`). `go test` role matrix, cross-project attacks; `verify -- accounts` |
 | **A pin must have a description** | **Done** | Prompted at placement; `npm run verify` (16/16) incl. whitespace and repair paths |
 | **Unfinished items surfaced** | **Done** | Marked on sheet + panel; export confirmation names the count |
 | **Who changed what, and when** | **Done** | Change log per annotation; shown in the panel |
-| **Sign-in seam for Sprint 2** | **Ready, not wired** | `SessionIdentityProvider` written; verify script signs a user in by swapping one argument |
+| **Sign-in, sign-up, sessions** | **Done** | PBKDF2 passwords, HttpOnly session cookies, rate limits, CSRF header; real names in every change and export. `go test` + browser end to end |
 | **Photos — camera and upload** | **Done** | Placed, stored, survived reload, embedded in the export as a real JPEG |
 | **Photo anchoring** | **Done** | Stored point identical through rotate + zoom; round-trip exact |
 | **Field-tool interface** | **Done** | Dark chrome, icon rail, 44px targets, responsive to 900px |
@@ -47,10 +47,18 @@ easy to write.
 | **Render errors cannot kill the app** | **Done** | Per-marker + app-level ErrorBoundary |
 | Verified in Acrobat / Preview | **Partial** | User confirmed Chrome; other two untested |
 | Verified on a physical iPad | **NOT DONE** | See "Open risks" |
-| Photos on punch items | Not started | Needs S3 pre-signed upload |
-| Auth, projects, browser upload | Not started | Deliberately deferred from Sprint 1 |
-| Go API persistence | Not started | Adapter written, endpoints not built |
+| **Photos shared across devices** | **Done** | Kept on the server with the project (Postgres now, S3 at deploy); older photos upload themselves. Second-origin browser test; `go test`; `verify -- photos` |
+| **Projects and people** | **Done** | Start a project, add people by email, change roles; a project always keeps an admin (race-tested) |
+| **Punch list with filters** | **Done** | Status, company, trade, assigned to me, search; same numbers as the pins and the issued PDF. `verify -- task` |
+| **Assigning to teammates** | **Done** | "Assigned to" offers the project's people |
+| **Pinch-zoom and two-finger pan** | **Done** | `verify -- pinch`; synthetic touch in the browser — a real iPad is SCRUM-38 |
+| **Overdue items flagged** | **Done** | Sheet + panel + list; `verify -- flags` |
+| **Returned working copy opens as its drawing** | **Done** | Markups come back live, as the same items; `verify -- working` |
+| **Checks on every pull request** | **Done** | GitHub Actions: verify, lint, build, `go test -race` against Postgres |
+| **Go API persistence** | **Done** | Markups, change history and exports in Postgres (SCRUM-39, 40, 41); the sheet keeps up with teammates |
 | Offline sync | Not started | Sprint 3 |
+| Drawings stored on the server | Not started | Each device opens its own copy of the PDF today |
+| Comments and replies | Not started | Sprint 3 — the change log already has a `comment` intent |
 
 ---
 
@@ -125,6 +133,34 @@ embedded font (~300KB per export) — a deliberate Sprint 3 decision.
 ---
 
 ## Session log
+
+### 2026-10-21 — Sprint 2 wrap-up: tested end to end, then the gaps it found
+
+Tested the whole product against the real Go server and Postgres — every tool,
+editing, undo, sheets, rotation, zoom, both exports, three roles, a second
+"device" on another origin, and 1280 / 1024 / 768 / 375px layouts. Fixed what
+broke:
+
+- **Photos never left the tablet.** The markup reached the server but the
+  picture did not: teammates saw "not on this device". Photos are now stored
+  on the server (SCRUM-45), and older ones upload themselves when shown.
+- **A returned working copy opened empty** on the server — restoring its
+  markups under the new file name collided with their own ids (409), and one
+  refusal abandoned the rest. It now opens as the drawing it came from.
+- **Exports said "Issued by Punch List"** with a person signed in.
+- **A failed edit looked like a dead button**: its error was cleared by the
+  reload that followed it.
+- **Teammates' changes needed a page reload** — the sheet now re-reads on
+  returning to the tab and on reopening the drawing.
+- **Interface:** the top bar crushed the file name at iPad width; the panel
+  covered the whole drawing on a phone; the coordinate inspector dominated the
+  panel; "Box" made a "rectangle"; the sign-in screen logged two errors.
+
+Built: the punch list with filters and assigning to teammates (SCRUM-32,
+SCRUM-52), CI on every pull request (SCRUM-37), the README and a demo script.
+
+Verified: 15 verify suites, 28 Go integration tests (also under `-race`), lint,
+build, and the browser end to end.
 
 ### 2026-09-06 — SCRUM-18 / SCRUM-19
 Three-tier skeleton in plain JavaScript: contracts as abstract base classes with
@@ -208,10 +244,15 @@ writing them again would duplicate every existing comment on every export.
 
 ## Next up
 
-1. **Open the export in Acrobat and Preview.** Screenshot into `docs/verification/`.
-2. **Run it on an iPad** over the LAN and draw with a finger.
-3. Replace `window.prompt` with an inline text editor.
-4. Decide with the team which Jira tickets this closes.
+1. **Merge to main** — the accounts work (#18), then the Sprint 2 wrap-up.
+2. **Run it on a real iPad** (SCRUM-38) over the LAN: draw with a finger,
+   pinch, take a photo with the camera.
+3. **Deploy to AWS with HTTPS** (SCRUM-49): photos move from Postgres to S3 in
+   `backend/media.go`; set the cookie's Secure flag behind the load balancer.
+4. **An end-to-end browser test in CI** (SCRUM-53): open a drawing, place a
+   pin, export.
+5. **Open the exports in Acrobat and Preview**, screenshot into
+   `docs/verification/`.
 
 ---
 
