@@ -5,7 +5,7 @@
  * WHY THE PROJECT IS PART OF THE ID
  * ===========================================================================
  * A sheet's id is derived from its file name and page — `A-101.pdf#0` — so
- * that it is the same every time the file is opened (see sheetIdentity). With
+ * that it is the same every time the file is opened (see documents/sheetNames). With
  * one person on one tablet that is enough. With projects it is not: two
  * projects can each have an `A-101.pdf`, and the server has to know which
  * project a markup is on before it can decide whether the person sending it

@@ -4,3 +4,4 @@ export {
   UploadingChangeLogRepository,
   UploadingExportHistoryRepository,
 } from './UploadingRepositories';
+export { UploadingMediaStore } from './UploadingMediaStore';

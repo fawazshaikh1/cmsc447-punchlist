@@ -1,0 +1,219 @@
+/* ===========================================================================
+   PUNCH LIST — the side panel's second view (SCRUM-32, SCRUM-52)
+   ---------------------------------------------------------------------------
+   Built from the design system's tokens in index.css. Status colours are the
+   DATA colours a pin is drawn in, so item 7's badge here is the colour of the
+   pin with 7 in it.
+   ------------------------------------------------------------------------ */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The two views share the panel; the bar above them switches between. */
+.panel-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--ink-900);
+}
+
+.panel-tab {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-300);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.panel-tab[aria-selected='true'] {
+  background: var(--ink-650);
+  color: var(--white);
+}
+
+.punch-list {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px 20px;
+}
+
+.punch-filters {
+  display: grid;
+  gap: 8px;
+}
+
+.punch-search,
+.punch-filter-row select {
+  font: inherit;
+  font-size: 16px; /* anything less and iOS zooms on focus */
+  min-height: 40px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+/* Status on a row of its own, company and trade sharing the next: three
+   across a 360px panel cut every one of them to "Any comp…". */
+.punch-filter-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.punch-filter-row select:first-of-type {
+  grid-column: 1 / -1;
+}
+
+.punch-mine {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--tap);
+  color: var(--ink-100);
+  font-size: 14px;
+}
+
+.punch-mine input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+.punch-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0;
+}
+
+.punch-clear {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-100);
+  font-size: 13px;
+}
+
+.punch-empty,
+.punch-error {
+  margin: 0;
+}
+
+.punch-group {
+  display: grid;
+  gap: 6px;
+}
+
+.punch-group-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 6px 0 0;
+  color: var(--ink-200);
+  font-size: 13px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.punch-items {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.punch-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--ink-700);
+  color: var(--paper);
+  text-align: left;
+}
+
+.punch-item:hover:not(:disabled) {
+  border-color: var(--ink-500);
+}
+
+.punch-item:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.punch-number {
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 13px;
+  color: var(--white);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--ink-500);
+}
+
+.punch-number.status-open {
+  background: var(--status-open);
+}
+
+.punch-number.status-ready_for_review {
+  background: var(--status-review);
+}
+
+.punch-number.status-closed {
+  background: var(--status-closed);
+}
+
+.punch-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.punch-description {
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.punch-meta {
+  color: var(--ink-300);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.punch-due {
+  color: var(--ink-200);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.punch-due.overdue {
+  color: #ff9c8d;
+  font-weight: 600;
+}

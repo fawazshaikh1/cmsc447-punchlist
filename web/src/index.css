@@ -376,6 +376,10 @@ button:disabled {
 .file-button {
   position: relative;
   overflow: hidden;
+  /* The file NAME gives way when the bar is tight, never this button: a label
+     squeezed to "Op…" is neither a label nor an icon. Below 1180px it drops to
+     its icon instead (see RESPONSIVE). */
+  flex: none;
 }
 
 .file-button input[type='file'] {
@@ -1244,14 +1248,75 @@ button:disabled {
 .inspector-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  padding: 10px 14px;
+  min-height: var(--tap);
+  padding: 0 14px;
   cursor: pointer;
   user-select: none;
+  list-style: none;
+}
+
+/* Safari draws its own disclosure triangle unless told not to. */
+.inspector-header::-webkit-details-marker {
+  display: none;
+}
+
+.inspector-title {
+  color: var(--ink-200);
+  font-weight: 600;
+}
+
+.inspector-title::before {
+  content: '▸';
+  display: inline-block;
+  width: 1.2em;
+  color: var(--ink-300);
+  transition: transform var(--dur) ease;
+}
+
+.inspector[open] .inspector-title::before {
+  transform: rotate(90deg);
+}
+
+.inspector-body {
+  display: grid;
+  gap: 10px;
+  padding: 0 0 14px;
+}
+
+.inspector-body > p {
+  margin: 0;
+  padding: 0 14px;
+}
+
+.inspector-scroll {
+  overflow-x: auto;
+}
+
+.inspector-clear {
+  justify-self: start;
+  margin: 0 14px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-200);
+  font-size: 13px;
+}
+
+.inspector-clear:hover:not(:disabled) {
+  background: var(--ink-650);
+}
+
+.inspector-clear:disabled {
+  opacity: 0.45;
 }
 
 .inspector table {
   width: 100%;
+  min-width: 420px;
   border-collapse: collapse;
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
@@ -1287,6 +1352,15 @@ button:disabled {
    RESPONSIVE — 1024 is an iPad in landscape, 768 portrait
    ------------------------------------------------------------------------ */
 
+/* With a drawing open, the drawing's name is worth more than the product's:
+   below 1440px the brand keeps its mark and gives its name's width to the
+   file name beside it. */
+@media (max-width: 1439px) {
+  .topbar.has-document .brand-name {
+    display: none;
+  }
+}
+
 @media (max-width: 1180px) {
   .app-body {
     grid-template-columns: 68px minmax(0, 1fr) 310px;
@@ -1307,6 +1381,28 @@ button:disabled {
   }
 
   .has-document .file-button .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* 1001–1180px is still a single row — an iPad in landscape is here — and the
+   drawing's name was left about 60px. The safe export gives up its label, as
+   it does on a phone; "Issue PDF" keeps its own. Below 1000px the bar wraps
+   to two rows, there is room again, and the label comes back. */
+@media (min-width: 1001px) and (max-width: 1180px) {
+  .export-working {
+    flex: none;
+    justify-content: center;
+    width: var(--tap);
+    padding: 0;
+  }
+
+  .export-working .btn-label {
     position: absolute;
     width: 1px;
     height: 1px;

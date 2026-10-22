@@ -5,7 +5,7 @@ import { HttpJsonClient } from '../persistence/HttpJsonClient';
 /**
  * Sign-in against the Go API. TIER 3.
  *
- *   GET  /api/auth/me        -> 200 account | 401
+ *   GET  /api/auth/me        -> 200 account | 200 null (nobody signed in)
  *   POST /api/auth/login     {email, password}                          -> 200 account
  *   POST /api/auth/register  {email, password, displayName, company, title} -> 201 account
  *   POST /api/auth/logout    -> 204
@@ -26,10 +26,12 @@ export class HttpAccountRepository extends AccountRepository {
 
   async current() {
     try {
-      return Account.fromJSON(await this.http.getJson('/auth/me'));
+      const account = await this.http.getJson('/auth/me');
+      return account ? Account.fromJSON(account) : null;
     } catch (error) {
-      // Not signed in is an answer, not a failure. Anything else — the server
-      // being down — is a failure the sign-in screen should explain.
+      // Not signed in is an answer, not a failure — the server says so with
+      // null, and an older server with 401. Anything else (the server being
+      // down) is a failure the sign-in screen should explain.
       if (error?.status === 401) return null;
       throw error;
     }

@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-import { sheetIdFor } from '../sheetIdentity';
+import { sheetIdFor } from '../../domain/documents/sheetNames';
 import { useSheetScope } from './useSession';
 
 /**

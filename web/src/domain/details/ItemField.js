@@ -116,6 +116,17 @@ export class ItemField {
     return [];
   }
 
+  /**
+   * A named source of suggestions the app may know about at run time and
+   * the field cannot — 'people' for the project's members. The interface
+   * looks the name up; a field with none gets only its own list.
+   *
+   * @returns {string|null}
+   */
+  getSuggestionSource() {
+    return null;
+  }
+
   /** @returns {number|undefined} Longest value accepted, in characters. */
   getMaxLength() {
     return undefined;

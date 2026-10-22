@@ -17,7 +17,7 @@ export function useExport() {
   const flattenedSeals = exportsFlattened.seals();
 
   const exportDocument = useCallback(
-    async ({ sourceFile, pageCount, sheetIdFor, author, flatten = false }) => {
+    async ({ sourceFile, documentName = sourceFile?.name, pageCount, sheetIdFor, author, flatten = false }) => {
       if (!sourceFile) return;
 
       setStatus({ busy: true, message: 'Reading drawing…', error: null });
@@ -36,7 +36,7 @@ export function useExport() {
             pageCount,
             sheetIdFor,
             author,
-            documentName: sourceFile.name,
+            documentName,
             onProgress: (done, total) =>
               setStatus({
                 busy: true,
@@ -88,10 +88,12 @@ export function useExport() {
           editor.reset();
         }
 
+        // Named after the drawing, not the file: exporting a returned
+        // working copy again gives `A-101-marked-up.pdf`, not
+        // `A-101-marked-up-marked-up.pdf`.
         download(
           bytes,
-          sourceFile.name.replace(/\.pdf$/i, '') +
-            (flatten ? '-marked-up-flat.pdf' : '-marked-up.pdf'),
+          documentName.replace(/\.pdf$/i, '') + (flatten ? '-marked-up-flat.pdf' : '-marked-up.pdf'),
         );
 
         setStatus({

@@ -623,6 +623,74 @@ the sheet's.
 
 `npm run verify -- pinch` covers the arbiter's decisions and the geometry.
 
+## Photos on the server (SCRUM-45)
+
+In server mode a photo's bytes live on the server with its project, not only in
+the browser that took it — so a teammate sees it, an export from any device
+includes it, and a broken tablet loses nothing.
+
+| Piece | What it does |
+|---|---|
+| `backend/media.go` | `PUT /api/media/{key}?project=` stores the image; `GET` returns it to anyone on the project; `DELETE` is for editors |
+| `backend/media_schema.sql` | the `media` table (bytes in Postgres for now), applied at startup |
+| `HttpMediaStore` | the `MediaStore` port over that API |
+| `domain/upload/UploadingMediaStore` | new photos go to the server; a photo only this browser has is uploaded under its existing key the first time it is shown |
+
+The key is chosen in the browser (`photo_<uuid>`) because the photo is stored
+before the markup that shows it exists, and the markup records the key. Keeping
+the same key everywhere is what lets older photos migrate by themselves. Only
+real image types are accepted — not SVG, which can carry script — and responses
+are `private, immutable`. Moving the bytes to S3 for the deploy (SCRUM-49)
+changes `media.go`'s storage calls and nothing the browser sees.
+
+## The punch list (SCRUM-32, SCRUM-52)
+
+The side panel's second view: every punch item in the project, grouped by
+drawing, with filters for status (including "still to do" and overdue),
+company, trade, "assigned to me" and free text. Tapping an item on the drawing
+on screen goes to its sheet and selects it.
+
+- `domain/punchlist/TaskList` is pure: annotations in, numbered and filtered
+  rows out. Items are numbered per drawing with the same `assignOrdinals` call
+  that numbers the pins and the issued schedule — "item 7" is the pin with 7 in
+  it and line 7 of the PDF. What counts as an item is whatever
+  `PunchListRegistry` schedules (pins today).
+- `GET /api/projects/{id}/items` returns the project's markups in sheet order.
+  In browser mode the list covers the open drawing, read sheet by sheet.
+- **Assigning someone means picking a teammate.** A field may name a run-time
+  suggestion source (`ItemField.getSuggestionSource`); the assignee asks for
+  `'people'`, and the session supplies the open project's members — so the name
+  is spelled exactly as "Assigned to me" matches it.
+
+## A returned working copy is the same drawing
+
+A working copy of `A-101.pdf` usually comes back renamed —
+`A-101-marked-up.pdf`. It opens **as** `A-101.pdf`: each of our markups in the
+file records the sheet it was exported from (`documents/sheetNames`), so its
+pages are that drawing's sheets and its markups are the same items, not copies.
+On the server that is the only coherent answer — a markup id is unique across
+every sheet — and it means an edit made from the returned file reaches the
+items everyone else sees.
+
+Each markup is restored on its own; one that cannot be is left in the file,
+read-only, and counted so the user is told. Opened in a *different* project,
+a working copy's markups are copies there, with derived ids (`id~p2`), so
+reopening it finds them rather than making more.
+
+## Staying current
+
+With a team on one server, the open sheet is re-read — markups, who last
+touched them, seals — when the person comes back to the tab and when they open
+the same drawing again; the punch list re-reads the same way, and the session
+re-checks who they are and their role. Never in the middle of a gesture.
+
+## Checks on every pull request (SCRUM-37)
+
+`.github/workflows/checks.yml` runs the app's `verify`, `lint` and `build`, and
+the server's `go vet` and `go test -race` against a Postgres 17 service. In CI an
+unreachable test database fails the run (`REQUIRE_TEST_DATABASE`) instead of
+skipping every test.
+
 ## Directory map
 
 ```
@@ -650,7 +718,15 @@ web/src/
     ports/                     AnnotationRepository, DocumentSource,
                                IdGenerator, SheetExporter,
                                ExportHistoryRepository, IdentityProvider,
-                               ChangeLogRepository, MediaStore — all CONTRACTS
+                               ChangeLogRepository, MediaStore,
+                               AccountRepository, ProjectRepository,
+                               WorkingCopyReader, UploadLedger — all CONTRACTS
+    documents/                 sheetNames — how a sheet is named, and read back
+    punchlist/                 the schedule (PunchListRegistry, ordinals) and
+                               the on-screen list (TaskList), sharing numbers
+    upload/                    browser work reaching the server: markups,
+                               history, exports (BrowserUploadService) and
+                               photos (UploadingMediaStore)
     projects/                  SheetScope (a sheet's project, in its id),
                                Project, Member, ProjectRole
     services/                  AnnotationService (the tap->PdfPoint rule),
@@ -665,14 +741,15 @@ web/src/
     identity/                  CryptoIdGenerator,
                                SessionIdentityProvider (server mode)
     auth/                      HttpAccountRepository, HttpProjectRepository
-    media/                     IndexedDbMediaStore, CanvasImageProcessor
-    identity/                  CryptoIdGenerator
+    media/                     IndexedDbMediaStore, HttpMediaStore,
+                               CanvasImageProcessor
 
   presentation/                TIER 1 — React
     ServiceContainer.jsx       COMPOSITION ROOT — the only wiring file
     session/                   sign-in, project choice, people, account menu
     hooks/                     document / view state / annotations / drawing / export
     gestures/                  pinch-zoom and two-finger pan (SCRUM-48)
+    punchlist/                 the punch list view and its loader
     components/                canvas, overlay, toolbar, palette, inspector
       markers/                 7 SVG components + MarkerRegistry
     media/                     MediaUrlCache + useMediaUrl — object URLs made
@@ -686,8 +763,17 @@ web/src/
       useAutoFocus.js          focus that survives the gesture that opened it
 
 web/scripts/
-  verify-sealing.mjs           npm run verify — 26 checks total, no framework
-  verify-rules-and-attribution.mjs
+  verify-all.mjs               npm run verify — runs every verify-*.mjs (15
+                               suites); `npm run verify -- photos` runs one
+  verify-*.mjs                 one suite per behaviour, no framework
+
+backend/
+  main.go, history.go          markups, change history, exports
+  auth.go, projects.go         accounts and sessions; projects, members, roles
+  access.go                    the role check wrapped around every route
+  media.go                     photos
+  *_schema.sql                 applied at startup (schema.sql is the base)
+  *_test.go                    integration tests against punchlist_test
 ```
 
 ## A note on editor support

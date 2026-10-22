@@ -127,19 +127,22 @@ export function useSheetEditor({
     useCallback(() => activeSeals.ids, [activeSeals]),
   );
 
-  useEffect(() => {
+  /**
+   * Reads which markups on this sheet are sealed. Returns a cancel function:
+   * the user may change sheets while it is in flight, and applying a stale
+   * result would lock the wrong markups on the wrong drawing.
+   */
+  const loadSeals = useCallback(() => {
     let cancelled = false;
 
     if (!sheetId || !documentName) {
       activeSeals.replace([]);
-      return undefined;
+      return () => {};
     }
 
     void (async () => {
       try {
         const ids = await exportHistory.sealedIdsForSheet(documentName, sheetId);
-        // The user may have changed sheets while this was in flight. Applying a
-        // stale result would lock the wrong markups on the wrong drawing.
         if (!cancelled) activeSeals.replace(ids);
       } catch (cause) {
         // FAILING OPEN is the wrong answer, but it is the only one available:
@@ -160,6 +163,8 @@ export function useSheetEditor({
       cancelled = true;
     };
   }, [exportHistory, activeSeals, documentName, sheetId]);
+
+  useEffect(() => loadSeals(), [loadSeals]);
 
   /**
    * Whether a given markup may be changed, and why not.
@@ -204,6 +209,12 @@ export function useSheetEditor({
 
   // --- loading ------------------------------------------------------------
 
+  /**
+   * A markup to select as soon as it is on screen — chosen in the punch list,
+   * on a sheet that is still loading. Consumed by the load that brings it.
+   */
+  const selectWhenLoaded = useRef(null);
+
   const reload = useCallback(async () => {
     if (!sheetId) {
       setItems([]);
@@ -217,9 +228,15 @@ export function useSheetEditor({
       // Drop a selection whose annotation no longer exists — after an undo of
       // an add, or a delete. Leaving it would show a properties panel for
       // something that is not on the sheet.
-      setSelectedId((current) =>
-        current && loaded.some((a) => a.id === current) ? current : null,
-      );
+      const wanted = selectWhenLoaded.current;
+      if (wanted && loaded.some((a) => a.id === wanted)) {
+        selectWhenLoaded.current = null;
+        setSelectedId(wanted);
+      } else {
+        setSelectedId((current) =>
+          current && loaded.some((a) => a.id === current) ? current : null,
+        );
+      }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       return;
@@ -238,6 +255,41 @@ export function useSheetEditor({
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  // ---------------------------------------------------------------------------
+  // STAYING CURRENT
+  // ---------------------------------------------------------------------------
+  // On the server, teammates work on the same sheets. The sheet is read again
+  // — markups, attribution and seals — when the user comes back to the tab,
+  // and when they open the same drawing again, so a colleague's new photo or
+  // an item issued in the office appears without reloading the page. Never in
+  // the middle of a gesture: a drag or a half-drawn box is left alone.
+  const refresh = useCallback(() => {
+    if (draftRef.current || movingRef.current) return;
+    void reload();
+    loadSeals();
+  }, [reload, loadSeals]);
+
+  useEffect(() => {
+    const onReturn = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    window.addEventListener('focus', onReturn);
+    document.addEventListener('visibilitychange', onReturn);
+    return () => {
+      window.removeEventListener('focus', onReturn);
+      document.removeEventListener('visibilitychange', onReturn);
+    };
+  }, [refresh]);
+
+  // The same drawing opened again arrives as a new page on the same sheet id,
+  // which changes nothing the loaders above depend on — so it is noticed here.
+  const lastOpened = useRef({ page, sheetId });
+  useEffect(() => {
+    const previous = lastOpened.current;
+    lastOpened.current = { page, sheetId };
+    if (previous.page !== page && previous.sheetId === sheetId) refresh();
+  }, [page, sheetId, refresh]);
 
   /** Runs a mutation, then re-reads so the screen always matches storage. */
   const run = useCallback(
@@ -494,6 +546,18 @@ export function useSheetEditor({
     selected,
     selectedId,
     select: setSelectedId,
+    /**
+     * Selects a markup now if it is on this sheet, or as soon as the sheet it
+     * is on has loaded — for going to an item from the punch list, which may
+     * change the sheet first.
+     */
+    selectSoon: useCallback(
+      (id) => {
+        if (items.some((a) => a.id === id)) setSelectedId(id);
+        else selectWhenLoaded.current = id;
+      },
+      [items],
+    ),
 
     tool,
     toolId: tool.getId(),

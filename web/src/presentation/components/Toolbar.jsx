@@ -21,6 +21,8 @@ import { Icon } from './Icon';
  *
  * @param {object} props
  * @param {string | null} props.fileName
+ * @param {string | null} [props.documentName] The drawing the file is, when it
+ *        differs — a returned working copy. Said in the file name's tooltip.
  * @param {number} props.pageCount
  * @param {number} props.pageIndex
  * @param {number} props.scale
@@ -41,6 +43,7 @@ import { Icon } from './Icon';
  */
 export function Toolbar({
   fileName,
+  documentName = null,
   pageCount,
   pageIndex,
   scale,
@@ -84,7 +87,16 @@ export function Toolbar({
         </label>
 
         {(fileName || isLoading) && (
-          <span className="doc-chip" title={isLoading ? undefined : fileName}>
+          <span
+            className="doc-chip"
+            title={
+              isLoading
+                ? undefined
+                : documentName && documentName !== fileName
+                  ? `${fileName} — a working copy of ${documentName}, opened as that drawing`
+                  : fileName
+            }
+          >
             <Icon name="layers" size={16} />
             <strong>{isLoading ? 'Opening…' : fileName}</strong>
           </span>

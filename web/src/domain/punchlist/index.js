@@ -1,30 +1,13 @@
-import { PIN_KIND, PinStatus } from '../annotations';
+import { PIN_KIND } from '../annotations';
 import { PunchListEntry } from './PunchListEntry';
 import { PunchListRegistry } from './PunchListRegistry';
+import { statusLabel } from './statusLabels';
 
 export { PunchListEntry } from './PunchListEntry';
 export { PunchListRegistry } from './PunchListRegistry';
 export { assignOrdinals } from './ordinals';
-
-/**
- * How each status reads on a printed schedule.
- *
- * Kept here rather than on `PinStatus` because it is a presentation decision
- * about one document. The stored values stay lowercase and underscored, which
- * is what a database column and a future API want; only the schedule spells
- * them out. Adding a status means adding a line here — and if someone forgets,
- * `statusLabel` falls back to the raw value rather than printing nothing.
- */
-const STATUS_LABELS = Object.freeze({
-  [PinStatus.OPEN]: 'Open',
-  [PinStatus.READY_FOR_REVIEW]: 'Ready for review',
-  [PinStatus.CLOSED]: 'Closed',
-});
-
-/** @param {string} status */
-function statusLabel(status) {
-  return STATUS_LABELS[status] ?? String(status).replace(/_/g, ' ');
-}
+export { STATUS_LABELS, statusLabel } from './statusLabels';
+export { buildTaskList, filterTaskList, taskListOptions, TaskFilter } from './TaskList';
 
 /**
  * A pin is a punch item, so a pin is a row on the schedule.

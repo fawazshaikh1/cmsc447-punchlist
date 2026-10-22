@@ -9,7 +9,7 @@ import { enforceContract, abstractMethod } from '../support/contracts';
  * server's explanation.
  */
 export class ProjectRepository {
-  static REQUIRED = ['list', 'create', 'members', 'setMember', 'removeMember'];
+  static REQUIRED = ['list', 'create', 'members', 'setMember', 'removeMember', 'items'];
 
   constructor() {
     enforceContract(this, new.target, ProjectRepository);
@@ -55,5 +55,17 @@ export class ProjectRepository {
    */
   async removeMember(projectId, userId) {
     return abstractMethod('ProjectRepository', 'removeMember', projectId, userId);
+  }
+
+  /**
+   * Every markup in the project, on every drawing — for the punch list.
+   * In sheet order, and in the order each sheet lists them, so numbering
+   * them gives the numbers the pins show.
+   *
+   * @param {number} projectId
+   * @returns {Promise<import('../annotations/Annotation').Annotation[]>}
+   */
+  async items(projectId) {
+    return abstractMethod('ProjectRepository', 'items', projectId);
   }
 }

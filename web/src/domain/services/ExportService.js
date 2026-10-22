@@ -50,7 +50,11 @@ export class ExportService {
     exporter,
     exportHistory,
     ids,
-    { identity = new StaticIdentityProvider(), now = () => new Date().toISOString() } = {},
+    {
+      identity = new StaticIdentityProvider(),
+      now = () => new Date().toISOString(),
+      anonymousAuthor = 'Punch List',
+    } = {},
   ) {
     assertInstanceOf(annotations, AnnotationService, 'annotations');
     assertInstanceOf(exporter, SheetExporter, 'exporter');
@@ -64,6 +68,7 @@ export class ExportService {
     this.ids = ids;
     this.identity = identity;
     this.now = now;
+    this.anonymousAuthor = anonymousAuthor;
   }
 
   /**
@@ -107,9 +112,11 @@ export class ExportService {
     onProgress,
   }) {
     const actor = this.identity.current();
-    // An explicit author still wins, but the default is now the real answer to
-    // "who made these marks" rather than a hardcoded product name.
-    const attributedTo = author ?? actor.toString();
+    // An explicit author still wins; otherwise the person signed in — the
+    // answer to "who issued this" that Acrobat shows beside every markup and
+    // the punch list page prints. Nobody signed in (browser mode) is named as
+    // the product: "this device" means nothing to whoever reads the PDF.
+    const attributedTo = author ?? (actor.isAnonymous ? this.anonymousAuthor : actor.toString());
     const pages = [];
     const annotationIdsBySheet = {};
     let annotationCount = 0;

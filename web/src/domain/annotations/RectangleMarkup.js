@@ -20,6 +20,11 @@ export class RectangleMarkup extends TwoPointMarkup {
     return RECTANGLE_KIND;
   }
 
+  /** The tool that makes it is called Box. */
+  getTypeName() {
+    return 'box';
+  }
+
   /** @param {object} dto @returns {RectangleMarkup} */
   static fromJSON(dto) {
     return new RectangleMarkup(...TwoPointMarkup.argsFromJSON(dto));

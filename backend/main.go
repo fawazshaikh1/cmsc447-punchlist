@@ -44,7 +44,7 @@ func main() {
 	log.Println("connected to database")
 
 	if err := migrate(context.Background()); err != nil {
-		log.Fatalf("cannot apply auth_schema.sql: %v", err)
+		log.Fatalf("cannot apply auth_schema.sql / media_schema.sql: %v", err)
 	}
 
 	log.Println("server running on :8080")
@@ -76,6 +76,12 @@ func routes() http.Handler {
 	mux.HandleFunc("GET /api/projects/{projectID}/members", handleListMembers)
 	mux.HandleFunc("PUT /api/projects/{projectID}/members", handleSetMember)
 	mux.HandleFunc("DELETE /api/projects/{projectID}/members/{userID}", handleRemoveMember)
+	mux.HandleFunc("GET /api/projects/{projectID}/items", handleListProjectItems)
+
+	// Photos (media.go).
+	mux.HandleFunc("PUT /api/media/{key}", handlePutMedia)
+	mux.HandleFunc("GET /api/media/{key}", handleGetMedia)
+	mux.HandleFunc("DELETE /api/media/{key}", handleDeleteMedia)
 
 	return withCORS(requireAppRequest(mux))
 }

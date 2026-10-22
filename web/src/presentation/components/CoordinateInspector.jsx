@@ -13,8 +13,10 @@ import { useMemo } from 'react';
  * spike write-up and what you put in front of the stakeholder: zoom from 1x to
  * 4x and the PDF column is visibly frozen while the screen column scales.
  *
- * >>> Delete this, or hide it behind a dev flag, once the spikes are accepted.
- * >>> It is a diagnostic, not a product feature.
+ * The spikes are accepted, so it now sits CLOSED at the foot of the panel: a
+ * diagnostic, not a product feature, but still the quickest way to show a
+ * stakeholder that zooming and rotating move nothing. A native <details>, so
+ * it opens with a tap and remembers its state while the panel is hidden.
  *
  * @param {object} props
  * @param {import('../../domain/ports/DocumentSource').SheetPage} props.page
@@ -48,7 +50,7 @@ export function CoordinateInspector({
     return {
       id: annotation.id,
       ordinal: index + 1,
-      kind: annotation.getKind(),
+      kind: annotation.getTypeName(),
       pdf,
       screen,
       // 0.01pt tolerance — about 1/7000 inch. Looser would hide a real
@@ -60,60 +62,76 @@ export function CoordinateInspector({
   const allExact = rows.every((row) => row.exact);
 
   return (
-    <section className="inspector">
-      <header className="inspector-header">
-        <h2>Coordinate inspector</h2>
-        <span className="muted">
-          page {geometry.width}&times;{geometry.height} pts &middot; zoom {scale.toFixed(2)}x
-          &middot; rotation {rotation}&deg;
+    <details className="inspector">
+      <summary className="inspector-header">
+        <span className="inspector-title">Coordinate check</span>
+        <span className={rows.length === 0 ? 'muted' : allExact ? 'pass' : 'fail'}>
+          {rows.length === 0
+            ? 'no markups'
+            : allExact
+              ? `${rows.length} exact`
+              : 'precision lost'}
         </span>
+      </summary>
+
+      <div className="inspector-body">
+        <p className="muted">
+          Page {geometry.width}&times;{geometry.height} pts &middot; zoom {scale.toFixed(2)}x &middot;
+          rotation {rotation}&deg;
+        </p>
+
+        {rows.length === 0 ? (
+          <p className="muted">
+            Place a markup, then zoom &mdash; the PDF column must not move.
+          </p>
+        ) : (
+          <>
+            {/* Scrolls sideways inside the panel rather than pushing it wider:
+                the panel is 310px on a tablet and five columns do not fit. */}
+            <div className="inspector-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Kind</th>
+                    <th>Stored PDF point (frozen)</th>
+                    <th>Screen position @ {scale.toFixed(2)}x</th>
+                    <th>Round-trip exact?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.id} className={row.id === selectedId ? 'selected' : undefined}>
+                      <td>{row.ordinal}</td>
+                      <td>{row.kind}</td>
+                      <td className="mono">
+                        {row.pdf.x.toFixed(2)}, {row.pdf.y.toFixed(2)}
+                      </td>
+                      <td className="mono">
+                        {row.screen.x.toFixed(1)}, {row.screen.y.toFixed(1)}
+                      </td>
+                      <td className={row.exact ? 'pass' : 'fail'}>{row.exact ? 'yes' : 'NO'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className={allExact ? 'pass' : 'fail'}>
+              {allExact
+                ? `${rows.length} markup(s) anchored — every coordinate round-trips exactly.`
+                : 'A coordinate lost precision on round-trip. This should not happen.'}
+            </p>
+          </>
+        )}
+
+        {/* Every markup on the sheet, not just pins — and undoable. */}
         {onClear && (
-          <button type="button" onClick={onClear} disabled={rows.length === 0}>
-            Clear pins
+          <button type="button" className="inspector-clear" onClick={onClear} disabled={rows.length === 0}>
+            Clear sheet
           </button>
         )}
-      </header>
-
-      {rows.length === 0 ? (
-        <p className="muted">
-          Click the drawing to drop a pin. Then zoom &mdash; the PDF column must not move.
-        </p>
-      ) : (
-        <>
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Kind</th>
-                <th>Stored PDF point (frozen)</th>
-                <th>Screen position @ {scale.toFixed(2)}x</th>
-                <th>Round-trip exact?</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.id} className={row.id === selectedId ? 'selected' : undefined}>
-                  <td>{row.ordinal}</td>
-                  <td>{row.kind}</td>
-                  <td className="mono">
-                    {row.pdf.x.toFixed(2)}, {row.pdf.y.toFixed(2)}
-                  </td>
-                  <td className="mono">
-                    {row.screen.x.toFixed(1)}, {row.screen.y.toFixed(1)}
-                  </td>
-                  <td className={row.exact ? 'pass' : 'fail'}>{row.exact ? 'yes' : 'NO'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <p className={allExact ? 'pass' : 'fail'}>
-            {allExact
-              ? `${rows.length} markup(s) anchored — every coordinate round-trips exactly.`
-              : 'A coordinate lost precision on round-trip. This should not happen.'}
-          </p>
-        </>
-      )}
-    </section>
+      </div>
+    </details>
   );
 }

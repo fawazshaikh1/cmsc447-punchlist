@@ -22,7 +22,7 @@ export class AddAnnotationCommand extends Command {
   }
 
   describe() {
-    return `Add ${this.annotation.getKind()}`;
+    return `Add ${this.annotation.getTypeName()}`;
   }
 
   affects() {
@@ -50,7 +50,7 @@ export class DeleteAnnotationCommand extends Command {
   }
 
   describe() {
-    return `Delete ${this.annotation.getKind()}`;
+    return `Delete ${this.annotation.getTypeName()}`;
   }
 
   affects() {
@@ -84,7 +84,7 @@ export class UpdateAnnotationCommand extends Command {
   }
 
   describe() {
-    return `${this.label} ${this.next.getKind()}`;
+    return `${this.label} ${this.next.getTypeName()}`;
   }
 
   /**

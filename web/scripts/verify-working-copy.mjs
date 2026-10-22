@@ -22,6 +22,7 @@ import assert from 'node:assert/strict';
 import { PDFArray, PDFDict, PDFDocument, PDFHexString, PDFName } from 'pdf-lib';
 
 import { Pin, PinStatus } from '../src/domain/annotations/Pin.js';
+import { AnnotationRegistry } from '../src/domain/annotations/AnnotationRegistry.js';
 import '../src/domain/annotations/index.js';
 import '../src/domain/details/index.js';
 import { PhotoMarkup } from '../src/domain/annotations/PhotoMarkup.js';
@@ -42,7 +43,14 @@ import {
 } from '../src/infrastructure/workingcopy/workingCopyFormat.js';
 
 const ORIGINAL_SHEET = 'drawing.pdf#0';
-const REOPENED = (pageIndex) => `drawing-marked-up.pdf#${pageIndex}`;
+
+/**
+ * Opening the copy that came back from the architect, renamed on the way. It
+ * is opened AS the drawing it was exported from, so its markups are looked up
+ * — and live — on that drawing's sheets.
+ */
+const REOPENED = { fileName: 'drawing-marked-up.pdf', sheetIdFor: (doc, page) => `${doc}#${page}` };
+const HERE = ORIGINAL_SHEET;
 
 // --- fixtures ---------------------------------------------------------------
 
@@ -133,12 +141,94 @@ check('THE REPORTED BUG: a reopened working copy\'s pins are live markups again'
   const { repository, service } = build();
 
   const { restored } = await service.open(copy, REOPENED);
-  const live = await repository.listBySheet(REOPENED(0));
+  const live = await repository.listBySheet(HERE);
 
   assert.equal(restored, 2);
   assert.deepEqual(live.map((a) => a.id), ['pin-a', 'pin-b'], 'same ids, same order — so the same numbers');
   assert.ok(live.every((a) => a instanceof Pin), 'real Pins the select tool can pick up');
-  assert.equal(live[0].sheetId, REOPENED(0), 're-homed onto the sheet of the file actually open');
+  assert.equal(live[0].sheetId, HERE, 'on the sheet of the drawing the file is a copy of');
+});
+
+check('a returned working copy is the same drawing, whatever the file is called now', async () => {
+  const copy = await exportWorkingCopy(await drawingWithArchitectComment(), [pinA]);
+  const { documentName } = await build().service.open(copy, REOPENED);
+  assert.equal(documentName, 'drawing.pdf', 'not drawing-marked-up.pdf — so sheets, seals and exports all agree');
+});
+
+check('a PDF with none of our markups is its own drawing, under its own name', async () => {
+  const plain = await drawingWithArchitectComment();
+  const { documentName, restored } = await build().service.open(plain, { ...REOPENED, fileName: 'A-101.pdf' });
+  assert.equal(documentName, 'A-101.pdf');
+  assert.equal(restored, 0);
+});
+
+check('THE SERVER BUG: markups already on the drawing show, instead of an empty sheet', async () => {
+  // On the server an id is unique across every sheet, so restoring a copy of
+  // a markup under ANOTHER sheet is refused — which used to abandon the whole
+  // restore and leave the reopened copy looking empty.
+  class ServerLikeRepository extends InMemoryAnnotationRepository {
+    async save(annotation) {
+      for (const sheet of this.sheetsSeen ?? []) {
+        if (sheet !== annotation.sheetId && (await this.listBySheet(sheet)).some((a) => a.id === annotation.id)) {
+          throw new Error('A markup cannot be moved to a different sheet.');
+        }
+      }
+      (this.sheetsSeen ??= new Set()).add(annotation.sheetId);
+      return super.save(annotation);
+    }
+  }
+  const repository = new ServerLikeRepository();
+  await repository.save(pinA);
+  await repository.save(pinB);
+  const service = new WorkingCopyService(new PdfLibWorkingCopyReader(), repository);
+  const copy = await exportWorkingCopy(await drawingWithArchitectComment(), [pinA, pinB]);
+
+  const { restored, failed, bytes, documentName } = await service.open(copy, REOPENED);
+
+  assert.equal(documentName, 'drawing.pdf');
+  assert.equal(failed, 0);
+  assert.equal(restored, 0, 'both were already there — the server copies win');
+  assert.deepEqual((await repository.listBySheet(HERE)).map((a) => a.id), ['pin-a', 'pin-b']);
+  assert.equal((await annotationsIn(bytes)).result.filter((a) => a.ours).length, 0, 'not drawn twice');
+});
+
+check('one markup the store refuses does not take the others down with it', async () => {
+  const repository = new InMemoryAnnotationRepository();
+  const save = repository.save.bind(repository);
+  repository.save = async (annotation) => {
+    if (annotation.id === 'pin-a') throw new Error('refused');
+    return save(annotation);
+  };
+  const service = new WorkingCopyService(new PdfLibWorkingCopyReader(), repository);
+  const copy = await exportWorkingCopy(await drawingWithArchitectComment(), [pinA, pinB]);
+
+  const original = console.warn;
+  console.warn = () => {};
+  try {
+    const { restored, failed, bytes } = await service.open(copy, REOPENED);
+    assert.equal(restored, 1);
+    assert.equal(failed, 1, 'counted, so the user is told');
+    assert.deepEqual((await repository.listBySheet(HERE)).map((a) => a.id), ['pin-b']);
+    assert.equal((await annotationsIn(bytes)).result.filter((a) => a.ours).length, 1, 'the refused one stays in the file, read-only');
+  } finally {
+    console.warn = original;
+  }
+});
+
+check('opened in another project, a copy\'s markups are copies — with ids of their own, found again on reopening', async () => {
+  const inProject1 = (a) => AnnotationRegistry.fromJSON({ ...a.toJSON(), sheetId: 'p1:drawing.pdf#0' });
+  const copy = await exportWorkingCopy(await drawingWithArchitectComment(), [inProject1(pinA), inProject1(pinB)]);
+  const { repository, service } = build();
+  const intoProject2 = { fileName: 'drawing-marked-up.pdf', sheetIdFor: (doc, page) => `p2:${doc}#${page}` };
+
+  const first = await service.open(copy, intoProject2);
+  const live = await repository.listBySheet('p2:drawing.pdf#0');
+  assert.equal(first.restored, 2);
+  assert.deepEqual(live.map((a) => a.id), ['pin-a~p2', 'pin-b~p2'], 'never project 1\'s ids');
+
+  const second = await service.open(copy, intoProject2);
+  assert.equal(second.restored, 0, 'the same copies, not more of them');
+  assert.equal((await repository.listBySheet('p2:drawing.pdf#0')).length, 2);
 });
 
 check('everything about a markup survives the round trip', async () => {
@@ -146,7 +236,7 @@ check('everything about a markup survives the round trip', async () => {
   const { repository, service } = build();
   await service.open(copy, REOPENED);
 
-  const [a, b] = await repository.listBySheet(REOPENED(0));
+  const [a, b] = await repository.listBySheet(HERE);
   assert.equal(a.label, 'Outlet cover missing');
   assert.deepEqual(a.details.toJSON(), pinA.details.toJSON());
   assert.equal(b.status, PinStatus.READY_FOR_REVIEW);
@@ -181,7 +271,7 @@ check('re-exporting a reopened working copy does not duplicate a single markup',
   const { repository, service } = build();
   const { bytes } = await service.open(copy, REOPENED);
 
-  const again = await exportWorkingCopy(bytes, await repository.listBySheet(REOPENED(0)));
+  const again = await exportWorkingCopy(bytes, await repository.listBySheet(HERE));
   const { result } = await annotationsIn(again);
 
   assert.equal(result.filter((a) => a.ours).length, 2, 'two pins, not four');
@@ -196,7 +286,7 @@ check('reopening the same copy a second time restores nothing twice', async () =
   const second = await service.open(copy, REOPENED);
 
   assert.equal(second.restored, 0);
-  assert.equal((await repository.listBySheet(REOPENED(0))).length, 2);
+  assert.equal((await repository.listBySheet(HERE)).length, 2);
 });
 
 // =========================================================================
@@ -206,10 +296,10 @@ check('reopening the same copy a second time restores nothing twice', async () =
 check('an edit made here since is kept — the file\'s older copy does not overwrite it', async () => {
   const copy = await exportWorkingCopy(await drawingWithArchitectComment(), [pinA, pinB]);
   const { repository, service } = build();
-  await repository.save(pin('pin-a', 'Outlet cover missing — replaced, needs paint', REOPENED(0)));
+  await repository.save(pin('pin-a', 'Outlet cover missing — replaced, needs paint', HERE));
 
   const { restored, bytes } = await service.open(copy, REOPENED);
-  const [a] = await repository.listBySheet(REOPENED(0));
+  const [a] = await repository.listBySheet(HERE);
 
   assert.equal(restored, 1, 'only pin-b was new');
   assert.equal(a.label, 'Outlet cover missing — replaced, needs paint');
@@ -223,7 +313,7 @@ check('a markup deleted here stays deleted when the file is reopened', async () 
     new ChangeRecord({
       id: 'c1',
       annotationId: 'pin-a',
-      sheetId: REOPENED(0),
+      sheetId: HERE,
       intent: 'delete',
       actor: Actor.ANONYMOUS,
       at: '2026-10-05T13:00:00Z',
@@ -231,7 +321,7 @@ check('a markup deleted here stays deleted when the file is reopened', async () 
   );
 
   await service.open(copy, REOPENED);
-  assert.deepEqual((await repository.listBySheet(REOPENED(0))).map((a) => a.id), ['pin-b']);
+  assert.deepEqual((await repository.listBySheet(HERE)).map((a) => a.id), ['pin-b']);
 });
 
 check('a photo whose image is not on this device is left in the file, not destroyed', async () => {
@@ -250,13 +340,13 @@ check('a photo whose image is not on this device is left in the file, not destro
   const result = await elsewhere.service.open(copy, REOPENED);
   const left = await annotationsIn(result.bytes);
 
-  assert.deepEqual((await elsewhere.repository.listBySheet(REOPENED(0))).map((a) => a.id), ['pin-a']);
+  assert.deepEqual((await elsewhere.repository.listBySheet(HERE)).map((a) => a.id), ['pin-a']);
   assert.equal(left.result.filter((a) => a.ours).length, 1, 'the photo stays, picture and all');
   assert.equal(left.marked, true, 'still marked, so a device that has the image can restore it');
 
   const here = build({ media: { get: async () => new Blob(['jpeg']) } });
   await here.service.open(copy, REOPENED);
-  assert.deepEqual((await here.repository.listBySheet(REOPENED(0))).map((a) => a.id), ['pin-a', 'photo-1']);
+  assert.deepEqual((await here.repository.listBySheet(HERE)).map((a) => a.id), ['pin-a', 'photo-1']);
 });
 
 check('a markup this build cannot rebuild is left in the file, read-only', async () => {
@@ -278,7 +368,7 @@ check('a markup this build cannot rebuild is left in the file, read-only', async
 
   assert.equal(result.restored, 0);
   assert.equal(result.bytes, future, 'nothing taken out, so the very same bytes');
-  assert.deepEqual(await repository.listBySheet(REOPENED(0)), []);
+  assert.deepEqual(await repository.listBySheet(HERE), []);
 });
 
 // =========================================================================
@@ -315,7 +405,7 @@ check('damaged markup data is ignored, not fatal', async () => {
 
   const { repository, service } = build();
   await service.open(damaged, REOPENED);
-  assert.deepEqual((await repository.listBySheet(REOPENED(0))).map((a) => a.id), ['pin-b']);
+  assert.deepEqual((await repository.listBySheet(HERE)).map((a) => a.id), ['pin-b']);
 });
 
 check('a reader that fails does not stop the drawing opening', async () => {
