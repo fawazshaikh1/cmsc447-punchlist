@@ -22,7 +22,8 @@ import { useMemo } from 'react';
  * @param {number} props.rotation
  * @param {import('../../domain/annotations/Annotation').Annotation[]} props.annotations
  * @param {string | null} props.selectedId
- * @param {() => void} props.onClear
+ * @param {() => void} [props.onClear] Omitted for a role that may not delete,
+ *        which hides the button.
  */
 export function CoordinateInspector({
   page,
@@ -66,9 +67,11 @@ export function CoordinateInspector({
           page {geometry.width}&times;{geometry.height} pts &middot; zoom {scale.toFixed(2)}x
           &middot; rotation {rotation}&deg;
         </span>
-        <button type="button" onClick={onClear} disabled={rows.length === 0}>
-          Clear pins
-        </button>
+        {onClear && (
+          <button type="button" onClick={onClear} disabled={rows.length === 0}>
+            Clear pins
+          </button>
+        )}
       </header>
 
       {rows.length === 0 ? (

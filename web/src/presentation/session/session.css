@@ -1,0 +1,367 @@
+/* ===========================================================================
+   SIGN-IN, PROJECTS AND PEOPLE (SCRUM-43, 44)
+   ---------------------------------------------------------------------------
+   Built from the design system's tokens in index.css, so these screens are the
+   same product as the editor: dark chrome, one accent, 44px targets, 16px type
+   in every field so iOS never zooms on focus.
+   ------------------------------------------------------------------------ */
+
+.session-screen {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--ink-900);
+}
+
+.session-card {
+  width: min(440px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 28px;
+  border: 1px solid var(--ink-700);
+  border-radius: var(--radius-lg);
+  background: var(--ink-800);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.session-card-wide {
+  width: min(600px, 100%);
+}
+
+.session-card h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.session-card > p {
+  margin: 0;
+}
+
+/* The top bar's brand, without what the top bar needs: there it is divided
+   from the controls beside it and loses its name at tablet width; alone on a
+   card it needs neither. */
+/* Two classes deep on purpose: index.css loads after this file, and its
+   single-class .brand rule would otherwise win. */
+.session-card .session-brand {
+  padding: 0;
+  margin: 0;
+  border-right: 0;
+}
+
+.session-brand .brand-name {
+  display: inline;
+}
+
+.session-strong {
+  color: var(--white);
+  font-weight: 600;
+}
+
+/* Title on the left, its one action on the right. */
+.session-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-heading h2 {
+  margin: 0;
+}
+
+/* --- sign in / create account ------------------------------------------- */
+
+.session-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius);
+  background: var(--ink-900);
+}
+
+.session-tab {
+  min-height: 40px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-200);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.session-tab.active {
+  background: var(--ink-650);
+  color: var(--white);
+}
+
+.session-form {
+  display: grid;
+  gap: 14px;
+}
+
+.session-form .field > .muted,
+.session-form .field > .field-error {
+  font-weight: 400;
+}
+
+.session-submit {
+  justify-content: center;
+  width: 100%;
+}
+
+/* --- choosing a project ---------------------------------------------------- */
+
+.session-empty {
+  padding: 16px;
+  border: 1px dashed var(--ink-600);
+  border-radius: var(--radius);
+  color: var(--ink-200);
+  line-height: 1.55;
+}
+
+.project-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.project-option {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius);
+  background: var(--ink-700);
+  color: var(--paper);
+  text-align: left;
+  transition: background var(--dur) ease, border-color var(--dur) ease;
+}
+
+.project-option:hover:not(:disabled) {
+  background: var(--ink-650);
+  border-color: var(--ink-500);
+}
+
+.project-option:disabled {
+  opacity: 0.6;
+}
+
+.project-option > svg {
+  flex: none;
+  color: var(--ink-300);
+}
+
+.project-option-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-create {
+  padding-top: 16px;
+  border-top: 1px solid var(--ink-700);
+}
+
+/* Roles are chrome, not data, so they stay neutral — the coloured status
+   palette is reserved for what markups mean. Admin gets the accent outline
+   because it is the one role that can change other people's access. */
+.role-badge {
+  flex: none;
+  padding: 2px 10px;
+  border: 1px solid var(--ink-500);
+  border-radius: 999px;
+  color: var(--ink-100);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.role-badge.role-admin {
+  border-color: var(--accent);
+  color: var(--white);
+}
+
+/* --- people on a project --------------------------------------------------- */
+
+.member-list {
+  display: grid;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ink-700);
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--ink-700);
+}
+
+.member-who {
+  display: grid;
+  min-width: 0;
+}
+
+.member-who strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.member-who .small {
+  overflow-wrap: anywhere;
+}
+
+.member-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.member-controls select {
+  font: inherit;
+  font-size: 16px;
+  min-height: 40px;
+  padding: 6px 8px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: var(--ink-900);
+  color: var(--paper);
+}
+
+.member-add {
+  padding-top: 12px;
+}
+
+.member-add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 8px;
+}
+
+@media (max-width: 560px) {
+  .member-add-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .member-row {
+    flex-wrap: wrap;
+  }
+}
+
+/* --- the account menu in the top bar -------------------------------------- */
+
+.session-menu {
+  position: relative;
+  flex: none;
+}
+
+.session-menu-button {
+  gap: 10px;
+  padding: 0 12px 0 6px;
+  max-width: 260px;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ink-500);
+  color: var(--white);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.session-menu-text {
+  display: grid;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.2;
+}
+
+.session-menu-project {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-menu-role {
+  color: var(--ink-300);
+  font-size: 12px;
+}
+
+/* At tablet width the top bar is already full; the avatar alone is enough. */
+@media (max-width: 1100px) {
+  .session-menu-text {
+    display: none;
+  }
+
+  .session-menu-button {
+    padding: 0 6px;
+  }
+}
+
+/* Fixed, at coordinates SessionMenu measures from its button — it is
+   portalled to the end of the page, out of the top bar's stacking context. */
+.session-menu-popover {
+  position: fixed;
+  z-index: var(--z-modal);
+  width: 260px;
+  display: grid;
+  padding: 6px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius);
+  background: var(--ink-800);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+}
+
+.session-menu-who {
+  display: grid;
+  margin: 0 0 6px;
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--ink-700);
+  overflow-wrap: anywhere;
+}
+
+.session-menu-popover button {
+  min-height: var(--tap);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--paper);
+  font-size: 14px;
+  text-align: left;
+}
+
+.session-menu-popover button:hover {
+  background: var(--ink-650);
+}
+
+.session-menu-error {
+  position: fixed;
+  z-index: var(--z-modal);
+  width: min(300px, calc(100vw - 16px));
+  cursor: pointer;
+}

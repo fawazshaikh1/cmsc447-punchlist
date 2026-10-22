@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { ServiceContainer } from './presentation/ServiceContainer';
 import { ErrorBoundary, AppErrorFallback } from './presentation/components/ErrorBoundary';
+import { SessionGate } from './presentation/session/SessionGate';
 import './index.css';
 
 const container = document.getElementById('root');
@@ -17,7 +18,11 @@ createRoot(container).render(
     <ErrorBoundary label="app" fallback={(error) => <AppErrorFallback error={error} />}>
       {/* The composition root. Swap implementations here and nowhere else. */}
       <ServiceContainer>
-        <App />
+        {/* Sign-in and project choice, in server mode. Browser mode passes
+            straight through. */}
+        <SessionGate>
+          <App />
+        </SessionGate>
       </ServiceContainer>
     </ErrorBoundary>
   </StrictMode>,

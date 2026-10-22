@@ -15,6 +15,5 @@ export { AllowAllPolicy } from './AllowAllPolicy';
 export { SealedByExportPolicy } from './SealedByExportPolicy';
 export { CompositeEditPolicy } from './CompositeEditPolicy';
 
-// Written, intentionally NOT wired — see the file for why and for the one-line
-// change that switches roles on.
+// Wired in server mode, where people sign in — see ServiceContainer.
 export { RoleEditPolicy } from './RoleEditPolicy';

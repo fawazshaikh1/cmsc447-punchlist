@@ -9,7 +9,9 @@ import { Toolbar } from './presentation/components/Toolbar';
 import { useConfirmation } from './presentation/components/ConfirmDialog';
 import { Icon } from './presentation/components/Icon';
 import { FlattenExportNotice } from './presentation/components/SealingNotice';
-import { sheetIdFor as sheetIdOf } from './presentation/sheetIdentity';
+import { useSheetIdentity } from './presentation/session/useSheetIdentity';
+import { SessionMenu } from './presentation/session/SessionMenu';
+import { WhereWorkIsSaved } from './presentation/session/WhereWorkIsSaved';
 
 // Loading these three barrels is what registers every annotation type with
 // AnnotationRegistry, every marker component with MarkerRegistry, and every
@@ -54,6 +56,8 @@ export default function App() {
   const { busy: isExporting, message: exportMessage, error: exportError, exportDocument } = useExport();
   const { editor, exportsFlattened } = useServices();
   const { ask, dialog } = useConfirmation();
+  // Sheet ids inside the open project — see presentation/session.
+  const sheetIdOf = useSheetIdentity();
   // Failures from the checks that run BEFORE the export confirmation, which
   // useExport never sees because the export has not started yet.
   const [exportPrecheckError, setExportPrecheckError] = useState(null);
@@ -76,7 +80,7 @@ export default function App() {
   // it, because in Sprint 2 it becomes the sheet's real database id.
   const sheetIdFor = useCallback(
     (index) => (fileName ? sheetIdOf(fileName, index) : null),
-    [fileName],
+    [fileName, sheetIdOf],
   );
 
   const sheetId = sheetIdFor(pageIndex);
@@ -172,9 +176,13 @@ export default function App() {
         onResetZoom={resetZoom}
         onRotate={rotateClockwise}
         onExport={page ? handleExport : undefined}
-        onExportFlat={page ? onExportFlatClicked : undefined}
+        // Offered only to a role that may lock markups — RoleEditPolicy decides,
+        // and the server refuses it from anyone else regardless.
+        onExportFlat={page && editor.canIssue().allowed ? onExportFlatClicked : undefined}
         isExporting={isExporting}
-      />
+      >
+        <SessionMenu />
+      </Toolbar>
 
       {(error || exportError || exportPrecheckError || exportMessage) && (
         <div className="banner-row">
@@ -215,8 +223,7 @@ export default function App() {
             <div className="empty-state">
               <h1>Mark up a drawing, issue it as a PDF</h1>
               <p>
-                Open an architectural or engineering PDF to begin. Everything stays on this
-                device until you export &mdash; nothing is uploaded.
+                Open an architectural or engineering PDF to begin. <WhereWorkIsSaved />
               </p>
               <ol className="empty-steps">
                 <li>Pick a tool from the left, then tap the drawing to place a markup.</li>

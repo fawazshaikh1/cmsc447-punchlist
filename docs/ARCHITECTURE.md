@@ -193,11 +193,12 @@ no caller changes.
 | Class | Concern | Wired in? |
 |---|---|---|
 | `SealedByExportPolicy` | has this been issued? | yes |
-| `RoleEditPolicy` | does the user's role cover this? | **no — written and waiting** |
+| `RoleEditPolicy` | does the user's role cover this? | server mode, where people sign in |
 | `AllowAllPolicy` | nothing (Null Object) | default when no policy is given |
 
-Roles are deliberately not switched on: nobody signs in yet, so nobody has a
-role. Turning them on is one uncommented line in `ServiceContainer.jsx`.
+Roles came on with sign-in as one more entry in the policy array in
+`ServiceContainer.jsx` — no existing policy or caller changed. Browser mode
+leaves it out: nobody signs in there, and the anonymous actor has no role.
 
 ### The seal is a recorded fact, not a flag
 
@@ -360,17 +361,14 @@ The seam is `IdentityProvider`:
 
 | Class | Tier | Wired in? |
 |---|---|---|
-| `StaticIdentityProvider` | domain (pure) | yes — returns `Actor.ANONYMOUS` |
-| `SessionIdentityProvider` | infrastructure (fetches) | **no — the Sprint 2 destination** |
+| `StaticIdentityProvider` | domain (pure) | browser mode — returns `Actor.ANONYMOUS` |
+| `SessionIdentityProvider` | infrastructure (fetches) | server mode — the signed-in person, with their role on the open project |
 
 `EditorService` has asked `identity.current()` on every write since the day it
 was written, `ChangeRecord` stores whatever comes back, `ExportRecord` stamps it,
-and `RoleEditPolicy` reads the role off it. So Sprint 2 is one line:
-
-    - new StaticIdentityProvider()
-    + new SessionIdentityProvider('/api')
-
-and names start appearing in a log that has been running all along.
+and `RoleEditPolicy` reads the role off it. Sign-in (SCRUM-44) swapped the
+provider in the composition root, and names started appearing in a log that
+had been running all along — see "Accounts, projects and roles" below.
 
 `Actor.ANONYMOUS` is a real object, never `null`, so no call site needs
 `actor?.displayName ?? 'someone'` — the one that forgot would have printed
@@ -430,7 +428,14 @@ brew services start postgresql@17
   -c "CREATE DATABASE punchlist OWNER postgres;"
 PGPASSWORD=dev /opt/homebrew/opt/postgresql@17/bin/psql -h localhost -U postgres \
   -d punchlist -f backend/schema.sql
+
+# For `go test` only: a database the tests are free to wipe
+/opt/homebrew/opt/postgresql@17/bin/createdb -O postgres punchlist_test
 ```
+
+The sign-in tables (`backend/auth_schema.sql`) are applied by the server itself
+every time it starts, so a database made before accounts existed is brought up
+to date without anyone running psql.
 
 ### Every day
 
@@ -461,6 +466,14 @@ local storage (`punchlist.uploadedToServer`) records what is done, so it
 happens once; a failed upload is retried on the next read. Nothing that reads
 the stores knows the upload exists.
 
+With projects, the browser's work goes into **the first project that opens
+the drawing**: it was filed under the bare sheet id (`A-101.pdf#0`), and is
+uploaded under that project's (`p12:A-101.pdf#0`). The ledger is keyed by the
+bare id, so a second project with the same file does not get a copy. A role
+that may not write it (a collaborator cannot add a pin) does not block reading
+the sheet: the refusal is not recorded as done, and someone allowed to — the
+project's admin, on this browser — uploads it later.
+
 ### When the server is down
 
 The app says so — *"The Punch List server at /api is not responding (502 Bad
@@ -475,6 +488,102 @@ nothing, so an issued markup can never quietly become editable.
 `backend/main.go` and `backend/history.go`; `npm run verify -- upload` covers
 the one-time upload. Both were also run end to end against the real Go server
 and Postgres (see PR #14).
+
+## Accounts, projects and roles (SCRUM-42 to 47)
+
+Server mode needs a signed-in person working in a project. Browser mode is
+untouched: nobody signs in, sheets are named as before, every tool is offered.
+
+### On the server
+
+| File | What it does |
+|---|---|
+| `auth.go` | register, sign in, sign out, `GET /api/auth/me`, `GET /api/session?project=` |
+| `projects.go` | create and list projects; list, add, re-role and remove members |
+| `access.go` | wraps every markup, history and export route with the role check |
+| `auth_schema.sql` | sessions table, job title, `export_history.project_id` — applied at startup |
+
+Passwords are PBKDF2-SHA256 (600,000 iterations, random salt, standard
+library). The session is an opaque random cookie — HttpOnly, SameSite=Strict,
+Secure behind HTTPS — and only its SHA-256 digest is stored. A wrong password
+and an unknown email get the same answer in the same time, sign-in attempts are
+rate limited per address, and every state-changing request must carry
+`X-Punchlist-Request: 1`, which another site cannot add without the server's
+consent.
+
+**How the server knows a sheet's project.** Inside a project the browser names
+each sheet `p{projectId}:{file}#{page}` (`domain/projects/SheetScope`). The
+project is read from the id, so every request can be checked without a lookup
+table, two projects can both have an `A-101.pdf`, and a sheet can never be
+claimed by another project. An id without the prefix belongs to no project and
+is unreachable through the API.
+
+**Who may do what** — one table on each side, kept in step:
+
+| | Admin | Power collaborator | Collaborator |
+|---|---|---|---|
+| See the project's sheets and markups | yes | yes | yes |
+| Add photos | yes | yes | yes |
+| Add any other markup | yes | yes | no |
+| Move, resize, edit, change status, delete, clear a sheet | yes | yes | no |
+| Issue a flattened PDF (locks markups) | yes | yes | no |
+| Add people, change roles, remove people | yes | no | no |
+
+`RoleEditPolicy.RIGHTS` / `.CREATABLE` in the browser, `canEdit` /
+`collaboratorKinds` in `access.go`. The browser's copy decides what is
+*offered*; the server's is the one that counts. A role change takes effect on
+the next request — there is nothing cached in the session to go stale.
+
+The server also writes the **author of every change record itself**, from the
+session. A browser cannot attribute a change to someone else. The one claim it
+keeps is "this device" (the anonymous actor), which impersonates nobody and is
+the truth about history saved before sign-in existed and uploaded later.
+
+A project always keeps an admin: demoting or removing the last one is refused,
+inside a transaction that locks the project, so two admins demoting each other
+at the same moment cannot both succeed. A person is added by the email of an
+account that already exists — without email verification, an invitation
+waiting for an address would go to whoever registered it first.
+
+### In the browser
+
+```
+domain/projects/        SheetScope, Project, Member, ProjectRole
+domain/ports/           AccountRepository, ProjectRepository
+infrastructure/auth/    HttpAccountRepository, HttpProjectRepository
+presentation/session/   SessionGate -> SessionProvider (the state machine),
+                        SignInScreen, ProjectPicker, MembersDialog, SessionMenu,
+                        useSheetIdentity
+```
+
+`main.jsx` wraps the app in `SessionGate`, which shows sign-in, then the project
+list, then the app — keyed by project, so opening another project starts
+afresh. Opening a project calls `SessionIdentityProvider.useProject(id)`
+*before* the editor appears, so nothing is ever written as nobody.
+
+Hiding what a role cannot do asks the policy, never the role:
+
+| Control | Asked as |
+|---|---|
+| A tool in the rail | `editor.canCreate(tool.createsKind())` |
+| Issue PDF | `editor.canIssue()` (intent `issue`) |
+| Clear pins | `editor.canClearSheet()` |
+| Delete, size, editable fields | `editor.canEdit(markup, intent)` — a role lock *hides* them, an issued markup shows them disabled beside its notice |
+
+A server refusal (403) arrives as `EditNotPermittedError` carrying the
+server's own sentence, the same error the client-side policy throws, so the
+editor shows it in the usual place.
+
+Returning to the tab re-checks the session quietly: an expired session goes
+back to sign-in, removal from the project goes back to the project list, and a
+changed role updates the tools in place without closing the drawing.
+
+### Checks
+
+`cd backend && go test ./...` — 23 tests against a real Postgres
+(`punchlist_test`): sign-in and sessions, CSRF, rate limiting, the role matrix,
+cross-project attacks, last-admin races, server-side attribution.
+`npm run verify -- accounts` — 22 checks on the browser side.
 
 ## Pinch-zoom and two-finger pan (SCRUM-48)
 
@@ -530,7 +639,7 @@ web/src/
     policy/                    EditPolicy (CONTRACT), EditDecision,
                                SealedByExportPolicy, CompositeEditPolicy,
                                AllowAllPolicy, ActiveSeals,
-                               RoleEditPolicy (written, NOT wired)
+                               RoleEditPolicy (server mode)
     rules/                     AnnotationRule (CONTRACT), RuleViolation,
                                AnnotationRuleRegistry, RequiredDescriptionRule
     media/                     MediaRef — a pointer to bytes, not the bytes
@@ -542,6 +651,8 @@ web/src/
                                IdGenerator, SheetExporter,
                                ExportHistoryRepository, IdentityProvider,
                                ChangeLogRepository, MediaStore — all CONTRACTS
+    projects/                  SheetScope (a sheet's project, in its id),
+                               Project, Member, ProjectRole
     services/                  AnnotationService (the tap->PdfPoint rule),
                                EditorService (the ONLY writer),
                                ExportService
@@ -552,12 +663,14 @@ web/src/
     persistence/               InMemory | LocalStorage | Http, plus the
                                export-history and change-log repositories
     identity/                  CryptoIdGenerator,
-                               SessionIdentityProvider (written, NOT wired)
+                               SessionIdentityProvider (server mode)
+    auth/                      HttpAccountRepository, HttpProjectRepository
     media/                     IndexedDbMediaStore, CanvasImageProcessor
     identity/                  CryptoIdGenerator
 
   presentation/                TIER 1 — React
     ServiceContainer.jsx       COMPOSITION ROOT — the only wiring file
+    session/                   sign-in, project choice, people, account menu
     hooks/                     document / view state / annotations / drawing / export
     gestures/                  pinch-zoom and two-finger pan (SCRUM-48)
     components/                canvas, overlay, toolbar, palette, inspector
