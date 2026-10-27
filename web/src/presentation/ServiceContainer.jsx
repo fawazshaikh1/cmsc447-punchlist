@@ -37,6 +37,7 @@ import { CryptoIdGenerator } from '../infrastructure/identity/CryptoIdGenerator'
 import { SessionIdentityProvider } from '../infrastructure/identity/SessionIdentityProvider';
 import { HttpAccountRepository } from '../infrastructure/auth/HttpAccountRepository';
 import { HttpProjectRepository } from '../infrastructure/auth/HttpProjectRepository';
+import { HttpDrawingLibrary } from '../infrastructure/library/HttpDrawingLibrary';
 
 /**
  * ===========================================================================
@@ -199,6 +200,8 @@ export function ServiceContainer({
       // presentation/session knows there is nothing to sign in to.
       accounts: api ? new HttpAccountRepository(api) : null,
       projects: api ? new HttpProjectRepository(api) : null,
+      // The project's drawings, opened from any device (FR-10). Server mode only.
+      library: api ? new HttpDrawingLibrary(api) : null,
       // Both read directly by the editor hook. Exposed because they are domain
       // ports — the presentation layer depending on them is the dependency rule
       // working, not a leak.

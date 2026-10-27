@@ -12,6 +12,9 @@ import { FlattenExportNotice } from './presentation/components/SealingNotice';
 import { useSheetIdentity } from './presentation/session/useSheetIdentity';
 import { SessionMenu } from './presentation/session/SessionMenu';
 import { WhereWorkIsSaved } from './presentation/session/WhereWorkIsSaved';
+import { useLibrary } from './presentation/library/useLibrary';
+import { DrawingList } from './presentation/library/DrawingList';
+import { LibraryButton } from './presentation/library/LibraryButton';
 
 // Loading these three barrels is what registers every annotation type with
 // AnnotationRegistry, every marker component with MarkerRegistry, and every
@@ -51,6 +54,9 @@ export default function App() {
   const {
     page, pageCount, pageIndex, fileName, documentName, sourceFile, isLoading, error, openFile, openPage,
   } = useSheetDocument();
+  // The project's drawings: open one from the list, and an admin's drawing
+  // opened from this device is saved there for everyone (FR-10).
+  const library = useLibrary({ openFile });
 
   const { scale, rotation, zoomIn, zoomOut, resetZoom, zoomTo, rotateClockwise } = useViewState();
   const { busy: isExporting, message: exportMessage, error: exportError, exportDocument } = useExport();
@@ -177,7 +183,7 @@ export default function App() {
         pageIndex={pageIndex}
         scale={scale}
         isLoading={isLoading}
-        onOpenFile={(file) => void openFile(file)}
+        onOpenFile={(file) => void library.openFromDisk(file)}
         onSelectPage={(index) => void openPage(index)}
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
@@ -189,11 +195,32 @@ export default function App() {
         onExportFlat={page && editor.canIssue().allowed ? onExportFlatClicked : undefined}
         isExporting={isExporting}
       >
+        <LibraryButton
+          onOpen={(drawing) => void library.openFromLibrary(drawing)}
+          version={library.version}
+          onChanged={library.changed}
+          openName={documentName}
+        />
         <SessionMenu />
       </Toolbar>
 
-      {(error || exportError || exportPrecheckError || exportMessage) && (
+      {(error || exportError || exportPrecheckError || exportMessage || library.busy || library.notice || library.error) && (
         <div className="banner-row">
+          {library.busy && (
+            <p className="notice" role="status">
+              <Icon name="upload" size={18} /> {library.busy}
+            </p>
+          )}
+          {library.notice && (
+            <p className="notice" role="status">
+              <Icon name="check" size={18} /> {library.notice}
+            </p>
+          )}
+          {library.error && (
+            <p className="error" role="alert">
+              <Icon name="alert" size={18} /> {library.error}
+            </p>
+          )}
           {error && (
             <p className="error">
               <Icon name="alert" size={18} /> {error}
@@ -237,6 +264,11 @@ export default function App() {
               <p>
                 Open an architectural or engineering PDF to begin. <WhereWorkIsSaved />
               </p>
+              <DrawingList
+                onOpen={(drawing) => void library.openFromLibrary(drawing)}
+                version={library.version}
+                onChanged={library.changed}
+              />
               <ol className="empty-steps">
                 <li>Pick a tool from the left, then tap the drawing to place a markup.</li>
                 <li>

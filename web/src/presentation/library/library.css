@@ -1,0 +1,100 @@
+/* ===========================================================================
+   THE PROJECT'S DRAWINGS (FR-10)
+   ---------------------------------------------------------------------------
+   One list, shown on the start screen and in the Drawings dialog. Rows are
+   full-width tap targets, as in the punch list: on a tablet the whole row is
+   the button, never just its name.
+   ------------------------------------------------------------------------ */
+
+.drawing-library {
+  display: grid;
+  gap: 10px;
+}
+
+.drawing-library-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-100);
+}
+
+/* In the dialog the dialog's own heading names the list. */
+.modal .drawing-library-title {
+  display: none;
+}
+
+.drawing-library-empty {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.drawing-rows {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: min(48vh, 420px);
+  overflow-y: auto;
+}
+
+.drawing-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.drawing-open {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: var(--ink-700);
+  color: var(--paper);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.drawing-open:hover {
+  background: var(--ink-650);
+  border-color: var(--ink-500);
+}
+
+.drawing-open:focus-visible {
+  outline: 2px solid var(--accent-hi);
+  outline-offset: 2px;
+}
+
+.drawing-open.is-current {
+  border-color: var(--accent);
+}
+
+.drawing-open > svg {
+  flex: none;
+  color: var(--ink-200);
+}
+
+.drawing-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.drawing-text strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.drawing-current {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  color: var(--white);
+}

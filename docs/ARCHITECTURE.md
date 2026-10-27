@@ -677,6 +677,38 @@ read-only, and counted so the user is told. Opened in a *different* project,
 a working copy's markups are copies there, with derived ids (`id~p2`), so
 reopening it finds them rather than making more.
 
+## Drawings on the server (FR-10)
+
+A drawing used to live only on the device that opened it: its markups went to
+the server, the PDF under them did not, so a teammate — or the same person on
+another tablet — had to find the file again. Each project now keeps a library
+of its drawings, opened from the start screen or **Drawings** in the top bar,
+the way a file is uploaded once and then opened in Acrobat's file view.
+
+| Piece | What it does |
+|---|---|
+| `backend/documents.go` | the library: list, add (`POST ?name=`, the PDF as the body), open, delete. Members open; only an admin adds or deletes (FR-10.4) |
+| `backend/documents_schema.sql` | the `documents` table, applied at startup through `registerSchema` (`backend/schemas.go`) |
+| `domain/ports/DrawingLibrary` | the port; `HttpDrawingLibrary` implements it, wired in `ServiceContainer` (server mode only) |
+| `domain/library` | `LibraryDrawing`, and the two rules: who may change the library, and which opened drawings belong in it |
+| `presentation/library` | `useLibrary` (open from disk or from the library), `DrawingList`, `LibraryButton` |
+
+- **A drawing is known by its file name in the project**, because its sheets
+  already are (`p{project}:{name}#{page}`). Opening it from the library is
+  opening that file, so every markup, seal and export made on it is there.
+- **An admin's drawing opened from this device is saved to the project** once
+  it has opened — `useSheetDocument.openFile` resolves with what it opened.
+  The same file again is a no-op (matched by SHA-256); a different file under
+  a name already taken is refused, since it would inherit another drawing's
+  markups (carrying markups across a revised set is FR-1.5). Anyone else is
+  told the drawing is on their device only.
+- **A returned working copy is not stored**: it opens as the drawing it came
+  from, and its bytes are not that drawing's.
+- Bytes are in Postgres for now, like photos; S3 at deploy (SCRUM-49) changes
+  `documents.go`'s storage calls and nothing the browser sees.
+
+`go test` (`documents_test.go`) and `npm run verify -- library`.
+
 ## Staying current
 
 With a team on one server, the open sheet is re-read — markups, who last
@@ -720,7 +752,8 @@ web/src/
                                ExportHistoryRepository, IdentityProvider,
                                ChangeLogRepository, MediaStore,
                                AccountRepository, ProjectRepository,
-                               WorkingCopyReader, UploadLedger — all CONTRACTS
+                               WorkingCopyReader, UploadLedger,
+                               DrawingLibrary — all CONTRACTS
     documents/                 sheetNames — how a sheet is named, and read back
     punchlist/                 the schedule (PunchListRegistry, ordinals) and
                                the on-screen list (TaskList), sharing numbers
@@ -729,6 +762,8 @@ web/src/
                                photos (UploadingMediaStore)
     projects/                  SheetScope (a sheet's project, in its id),
                                Project, Member, ProjectRole
+    library/                   LibraryDrawing, who may change a project's
+                               drawings and which opened ones belong there
     services/                  AnnotationService (the tap->PdfPoint rule),
                                EditorService (the ONLY writer),
                                ExportService
@@ -743,6 +778,7 @@ web/src/
     auth/                      HttpAccountRepository, HttpProjectRepository
     media/                     IndexedDbMediaStore, HttpMediaStore,
                                CanvasImageProcessor
+    library/                   HttpDrawingLibrary — a project's drawings
 
   presentation/                TIER 1 — React
     ServiceContainer.jsx       COMPOSITION ROOT — the only wiring file
@@ -750,6 +786,8 @@ web/src/
     hooks/                     document / view state / annotations / drawing / export
     gestures/                  pinch-zoom and two-finger pan (SCRUM-48)
     punchlist/                 the punch list view and its loader
+    library/                   the project's drawings: the list, the top-bar
+                               dialog, opening from disk or from the server
     components/                canvas, overlay, toolbar, palette, inspector
       markers/                 7 SVG components + MarkerRegistry
     media/                     MediaUrlCache + useMediaUrl — object URLs made
@@ -763,7 +801,7 @@ web/src/
       useAutoFocus.js          focus that survives the gesture that opened it
 
 web/scripts/
-  verify-all.mjs               npm run verify — runs every verify-*.mjs (15
+  verify-all.mjs               npm run verify — runs every verify-*.mjs (16
                                suites); `npm run verify -- photos` runs one
   verify-*.mjs                 one suite per behaviour, no framework
 
