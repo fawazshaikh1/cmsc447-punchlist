@@ -91,9 +91,10 @@ func (u *User) profile() Profile {
 }
 
 // migrate brings an existing database up to what the server needs: sign-in
-// (auth_schema.sql), then photos (media_schema.sql). Each is idempotent.
+// (auth_schema.sql), then photos (media_schema.sql), then whatever other files
+// registered (schemas.go). Each is idempotent.
 func migrate(ctx context.Context) error {
-	for _, schema := range []string{authSchema, mediaSchema} {
+	for _, schema := range append([]string{authSchema, mediaSchema}, registeredSchemas...) {
 		if _, err := db.Exec(ctx, schema); err != nil {
 			return err
 		}

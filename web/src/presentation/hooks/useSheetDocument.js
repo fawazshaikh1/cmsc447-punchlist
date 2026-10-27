@@ -95,6 +95,9 @@ export function useSheetDocument() {
               ? `${failed} markup(s) in this file could not be brought back, so they are shown read-only.`
               : null,
         });
+        // What opened, for a caller that does something with it next — the
+        // library saves an admin's new drawing to the project.
+        return { fileName: file.name, documentName, sourceFile };
       } catch (error) {
         documentRef.current = null;
         setState({
@@ -107,6 +110,7 @@ export function useSheetDocument() {
           isLoading: false,
           error: error instanceof Error ? error.message : String(error),
         });
+        return null;
       }
     },
     [documents, workingCopies, sheetIdFor],

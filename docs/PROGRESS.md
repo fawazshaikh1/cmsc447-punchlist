@@ -4,7 +4,7 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-10-21 — Sprint 2 wrap-up
+**Last updated:** 2026-10-27 — drawings on the server
 **Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go + pgx · PostgreSQL 17 · AWS (S3, RDS) planned
 **Codebase:** 221 source files, ~27,450 lines (app and server)
 
@@ -57,7 +57,7 @@ easy to write.
 | **Checks on every pull request** | **Done** | GitHub Actions: verify, lint, build, `go test -race` against Postgres |
 | **Go API persistence** | **Done** | Markups, change history and exports in Postgres (SCRUM-39, 40, 41); the sheet keeps up with teammates |
 | Offline sync | Not started | Sprint 3 |
-| Drawings stored on the server | Not started | Each device opens its own copy of the PDF today |
+| **Drawings stored on the server** | **Done** | Each project keeps its PDFs; an admin's drawing is saved when opened, anyone on the project opens it from **Drawings** on any device. `go test` (4 tests), `verify -- library`, browser: second user opened it with every markup |
 | Comments and replies | Not started | Sprint 3 — the change log already has a `comment` intent |
 
 ---
@@ -133,6 +133,24 @@ embedded font (~300KB per export) — a deliberate Sprint 3 decision.
 ---
 
 ## Session log
+
+### 2026-10-27 — Drawings on the server (FR-10)
+
+Reported from use: after signing out or switching project, the start screen
+asked for the PDF again — markups were on the server, the drawing was not, so
+another device or another person had nothing to open them on.
+
+Each project now keeps its drawings (`backend/documents.go`). An admin's
+drawing is saved to the project when it opens; the start screen and
+**Drawings** in the top bar list the project's drawings with who added them and
+when, and one tap opens a drawing with every markup on it. Only an admin adds
+or removes drawings (FR-10.4); anyone else opening a local PDF is told it is on
+their device only.
+
+Verified: 4 new Go tests (32 in all, `-race`), a 16th verify suite
+(`verify -- library`, 13 checks), lint, build, and the browser — added as the
+admin, opened as the power collaborator from the list with all 11 markups,
+phone width.
 
 ### 2026-10-21 — Sprint 2 wrap-up: tested end to end, then the gaps it found
 

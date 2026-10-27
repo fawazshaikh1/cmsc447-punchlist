@@ -18,6 +18,8 @@ from a tablet, and the drawing is issued at the end.
   characters. *A passphrase is easier to type on site than symbols.*
 - **Start a project**: "Engineering Building". You are its admin.
 - **Open drawing** → the sample set. Four sheets; "Sheet 1 of 4" switches them.
+  It is saved to the project as it opens: everyone on it can now open it from
+  **Drawings**, on any device, without the file.
 
 ## 2. Raise punch items (2 min)
 
@@ -46,7 +48,7 @@ proven.
 - PM: account menu (top right) → **People on this project**. The sub must have
   an account first — in the second window, **Create account** as them.
 - PM adds them by email as **Collaborator**.
-- Sub: sign in → the project → open the same drawing. They see every item and
+- Sub: sign in → the project → tap the drawing in the list — no file needed. They see every item and
   photo the PM made. Their tool rail is **Select** and **Photo** only; Delete,
   Issue PDF and Clear sheet are gone; dragging a pin does nothing.
 - Sub adds a photo. PM clicks back into their window: it appears — the sheet
@@ -75,4 +77,4 @@ comes back `403` with the reason.
 | How are passwords stored? | PBKDF2-SHA256, 600,000 iterations, a random salt each. Sessions are HttpOnly cookies; the database holds only their digest. |
 | What stops a collaborator editing? | The server: every write is checked against the role on that project (`backend/access.go`). |
 | How do you add a markup type? | A new class, a marker component and an export writer, each registering itself — no existing file changes. See ARCHITECTURE.md. |
-| How is it tested? | 15 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |
+| How is it tested? | 16 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |

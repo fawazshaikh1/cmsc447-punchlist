@@ -83,6 +83,12 @@ func routes() http.Handler {
 	mux.HandleFunc("GET /api/media/{key}", handleGetMedia)
 	mux.HandleFunc("DELETE /api/media/{key}", handleDeleteMedia)
 
+	// Drawings (documents.go).
+	mux.HandleFunc("GET /api/projects/{projectID}/documents", handleListDocuments)
+	mux.HandleFunc("POST /api/projects/{projectID}/documents", handleAddDocument)
+	mux.HandleFunc("GET /api/projects/{projectID}/documents/{documentID}", handleGetDocument)
+	mux.HandleFunc("DELETE /api/projects/{projectID}/documents/{documentID}", handleDeleteDocument)
+
 	return withCORS(requireAppRequest(mux))
 }
 
