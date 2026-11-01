@@ -4,7 +4,7 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-10-27 — drawings on the server
+**Last updated:** 2026-11-01 — four bugs found taking the SRS screenshots
 **Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go + pgx · PostgreSQL 17 · AWS (S3, RDS) planned
 **Codebase:** 221 source files, ~27,450 lines (app and server)
 
@@ -133,6 +133,29 @@ embedded font (~300KB per export) — a deliberate Sprint 3 decision.
 ---
 
 ## Session log
+
+### 2026-11-01 — Four bugs found taking the SRS screenshots on the live site
+
+- **Pins numbered differently on the sheet.** The sheet counted every
+  markup (an arrow made the second pin "3") and restarted at 1 on each
+  sheet; the list and the issued PDF count pins only, across the drawing.
+  The sheet now numbers through `ordinalsOnSheet` — the same
+  `assignOrdinals` call, with the earlier sheets counted first
+  (`verify -- numbering`).
+- **Clouds clipped in the issued PDF.** The cloud's /Rect (its appearance's
+  /BBox) was padded by the first scallop's radius; side scallops reach
+  further, and came out cut flat. Now bounds every scallop
+  (`verify -- cloud`).
+- **Quickly filled-in items lost fields, and showed "Overdue" late.** On
+  the live server, trade, company, assignee and due date entered one after
+  another kept only company and due date. Edits were built from a copy on
+  screen two saves old, and saves raced. `SaveSequence` now orders saves
+  and drops reads that a newer read or a pending save has overtaken; an
+  update shows at once, so the next edit builds on it
+  (`verify -- save-sequence`; four fields back to back all stored in the
+  browser, the notice within 60 ms).
+- **Phone top bar five rows tall.** Flattened and reordered up to 560px:
+  three rows, 189px instead of 289px, every control kept at 44px.
 
 ### 2026-10-27 — Drawings on the server (FR-10)
 

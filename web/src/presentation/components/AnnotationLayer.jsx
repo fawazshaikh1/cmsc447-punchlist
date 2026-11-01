@@ -2,6 +2,7 @@ import { useCallback, useMemo, useRef } from 'react';
 
 import { MarkupFlagRegistry } from '../../domain/flags';
 import { ViewportPoint } from '../../domain/geometry/ViewportPoint';
+import { ordinalsOnSheet } from '../../domain/punchlist';
 import { currentFlagContext } from '../flags/flagContext';
 import { ErrorBoundary } from './ErrorBoundary';
 import { SourceAnnotationLayer } from './SourceAnnotationLayer';
@@ -159,6 +160,7 @@ export function AnnotationLayer({
   scale,
   rotation,
   annotations,
+  earlierMarkups,
   sourceAnnotations,
   showSource,
   selectedId,
@@ -173,6 +175,14 @@ export function AnnotationLayer({
   // Today, for the flags. Recomputed each render rather than memoised, so a
   // sheet left open past midnight picks up the new day on its next render.
   const flagContext = currentFlagContext();
+
+  // The number each pin shows: the punch list's and the issued PDF's number
+  // for it, not its position among every markup on the sheet — an arrow drawn
+  // between two pins must not renumber the second. See ordinalsOnSheet.
+  const ordinals = useMemo(
+    () => ordinalsOnSheet(annotations, earlierMarkups),
+    [annotations, earlierMarkups],
+  );
 
   // Scale 1 => output is in this SVG's own coordinate space.
   const layout = useMemo(() => page.createTransformer(1, rotation), [page, rotation]);
@@ -300,7 +310,7 @@ export function AnnotationLayer({
                 rotation={rotation}
                 x={project(annotation.getAnchor()).x}
                 y={project(annotation.getAnchor()).y}
-                ordinal={index + 1}
+                ordinal={ordinals.get(annotation) ?? index + 1}
                 isSelected={annotation.id === selectedId}
                 onSelect={onSelect}
               />

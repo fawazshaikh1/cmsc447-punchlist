@@ -1494,6 +1494,59 @@ button:disabled {
   .doc-chip strong {
     max-width: 10ch;
   }
+
+  /* ONE SET OF CONTROLS, THREE ROWS. Wrapped group by group, a phone's bar ran
+     to five rows — 289px, over a third of the screen above the drawing — with
+     the sheet picker, the zoom controls and the account each alone on a row.
+     With a drawing open, the two groups are flattened into the bar's one
+     wrapping row and ordered so the same controls fill three: the drawing and
+     who you are; which sheet, and the library; the view and the two exports,
+     still side by side. Every control keeps its 44px. Phones zoom with two
+     fingers, so the zoom readout is the one thing left out. */
+  .topbar.has-document .topbar-doc,
+  .topbar.has-document .topbar-actions {
+    display: contents;
+  }
+
+  .topbar.has-document .brand,
+  .topbar.has-document .file-button,
+  .topbar.has-document .doc-chip {
+    order: 1;
+  }
+
+  .topbar.has-document .session-menu {
+    order: 2;
+    margin-left: auto;
+  }
+
+  /* The end of the first row whatever the file name's length — a short name
+     would otherwise pull the sheet picker up beside the account. */
+  .topbar.has-document::after {
+    content: '';
+    order: 2;
+    flex-basis: 100%;
+    height: 0;
+  }
+
+  .topbar.has-document .sheet-nav {
+    order: 3;
+  }
+
+  .topbar.has-document .library-button {
+    order: 4;
+  }
+
+  .topbar.has-document .topbar-group {
+    order: 5;
+  }
+
+  .topbar.has-document .topbar-exports {
+    order: 6;
+  }
+
+  .topbar.has-document .readout {
+    display: none;
+  }
 }
 
 /* ===========================================================================

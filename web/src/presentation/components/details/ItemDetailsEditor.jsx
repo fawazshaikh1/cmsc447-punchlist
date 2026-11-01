@@ -75,6 +75,10 @@ export function ItemDetailsEditor({ annotation, readOnly, onUpdate, peers = [] }
       if (next === current) return;
 
       onUpdate(current, next, field.describeChange(next.details.get(field.getKey())));
+      // The next field's edit builds on this one, even if it is made before
+      // the item comes back as a prop — leaving a field and the next one can
+      // happen in one go, with no render in between.
+      latest.current = next;
     };
   };
 

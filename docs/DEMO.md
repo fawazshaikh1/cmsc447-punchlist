@@ -77,4 +77,4 @@ comes back `403` with the reason.
 | How are passwords stored? | PBKDF2-SHA256, 600,000 iterations, a random salt each. Sessions are HttpOnly cookies; the database holds only their digest. |
 | What stops a collaborator editing? | The server: every write is checked against the role on that project (`backend/access.go`). |
 | How do you add a markup type? | A new class, a marker component and an export writer, each registering itself — no existing file changes. See ARCHITECTURE.md. |
-| How is it tested? | 16 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |
+| How is it tested? | 19 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |
