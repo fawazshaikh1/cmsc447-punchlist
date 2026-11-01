@@ -31,9 +31,28 @@ PdfWriterRegistry.register(CLOUD_KIND, (markup, { pdfDoc, page, author }) => {
   const width = markup.style.strokeWidth;
   const arcs = scallopArcs(bounds, markup.getArcRadius());
 
-  // Padding accounts for the stroke AND for the scallops, which bulge a full
-  // radius beyond the rectangle. Without the radius the bumps would be clipped.
-  const rect = paddedRect(bounds, width + (arcs[0]?.r ?? 0) + 2);
+  // The appearance is clipped to /Rect (its /BBox), and the issued PDF paints
+  // that appearance into the page — anything outside it is lost. So the box
+  // must reach the scallops themselves, plus the stroke.
+  //
+  // It used to be padded by the FIRST scallop's radius. But every edge sizes
+  // its own scallops (see scallopArcs), and a scallop's circle sits off the
+  // edge towards its bulge, so it pokes out further than its radius: the
+  // sides of a wide cloud came out of "Issue PDF" cut flat. Bounding every
+  // scallop's circle is right whatever the edges choose.
+  const reach = arcs.reduce(
+    (box, { cx, cy, r }) => ({
+      left: Math.min(box.left, cx - r),
+      bottom: Math.min(box.bottom, cy - r),
+      right: Math.max(box.right, cx + r),
+      top: Math.max(box.top, cy + r),
+    }),
+    { left: bounds.x, bottom: bounds.y, right: bounds.x + bounds.width, top: bounds.y + bounds.height },
+  );
+  const rect = paddedRect(
+    { x: reach.left, y: reach.bottom, width: reach.right - reach.left, height: reach.top - reach.bottom },
+    width + 2,
+  );
 
   const ops = [`${num(r)} ${num(g)} ${num(b)} RG`, `${num(width)} w`];
 
