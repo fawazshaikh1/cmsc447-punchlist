@@ -31,7 +31,12 @@ export function LibraryButton({ onOpen, version, onChanged, openName }) {
 
   return (
     <>
-      <button type="button" className="btn" onClick={() => setOpen(true)} title={`Drawings in ${project.name}`}>
+      <button
+        type="button"
+        className="btn library-button"
+        onClick={() => setOpen(true)}
+        title={`Drawings in ${project.name}`}
+      >
         <Icon name="layers" size={18} />
         <span className="btn-label">Drawings</span>
       </button>
