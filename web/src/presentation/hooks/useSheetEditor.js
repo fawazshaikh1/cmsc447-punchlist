@@ -10,6 +10,7 @@ import {
 import { MarkupStyle } from '../../domain/annotations';
 import { ToolRegistry } from '../../domain/tools';
 import { useServices } from '../ServiceContainer';
+import { SaveSequence } from './SaveSequence';
 
 /**
  * Last-resort text collection, used only if no `promptForText` is supplied.
@@ -77,6 +78,9 @@ export function useSheetEditor({
   const [lastChanges, setLastChanges] = useState(() => new Map());
   // Bumped after every command so undo/redo button state re-reads from history.
   const [revision, setRevision] = useState(0);
+  // Saves one at a time, in order, and reads that know when they are stale —
+  // see SaveSequence for the edits this stopped losing.
+  const [saves] = useState(() => new SaveSequence());
 
   // Gesture state lives in refs as well as state. Several pointermove events
   // can fire before React commits a render, and a stale closure would then
@@ -216,6 +220,9 @@ export function useSheetEditor({
   const selectWhenLoaded = useRef(null);
 
   const reload = useCallback(async () => {
+    // Taken first, so even switching to no sheet overtakes a read still on
+    // its way for the previous one.
+    const current = saves.read();
     if (!sheetId) {
       setItems([]);
       setLastChanges(new Map());
@@ -223,6 +230,10 @@ export function useSheetEditor({
     }
     try {
       const loaded = await reader.listForSheet(sheetId);
+      // Overtaken — by a newer read, or by a save still on its way, whose own
+      // read will follow. Showing this answer would put an older copy of an
+      // item back on screen and let the next edit build on it.
+      if (!current()) return;
       setItems(loaded);
       setError(null);
       // Drop a selection whose annotation no longer exists — after an undo of
@@ -238,7 +249,7 @@ export function useSheetEditor({
         );
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      if (current()) setError(cause instanceof Error ? cause.message : String(cause));
       return;
     }
 
@@ -246,11 +257,12 @@ export function useSheetEditor({
     // last touched this" is useful context; it is not the user's work, and a
     // history read that fails must never stop a drawing from opening.
     try {
-      setLastChanges(await changeLog.latestBySheet(sheetId));
+      const latest = await changeLog.latestBySheet(sheetId);
+      if (current()) setLastChanges(latest);
     } catch {
-      setLastChanges(new Map());
+      if (current()) setLastChanges(new Map());
     }
-  }, [reader, changeLog, sheetId]);
+  }, [reader, changeLog, sheetId, saves]);
 
   useEffect(() => {
     void reload();
@@ -291,12 +303,16 @@ export function useSheetEditor({
     if (previous.page !== page && previous.sheetId === sheetId) refresh();
   }, [page, sheetId, refresh]);
 
-  /** Runs a mutation, then re-reads so the screen always matches storage. */
+  /**
+   * Runs a mutation, then re-reads so the screen always matches storage.
+   * Mutations queue behind each other (SaveSequence), so two made in quick
+   * succession reach storage in the order they were made.
+   */
   const run = useCallback(
     async (mutate) => {
       let failure = null;
       try {
-        await mutate();
+        await saves.write(mutate);
       } catch (cause) {
         failure = cause instanceof Error ? cause.message : String(cause);
       }
@@ -307,7 +323,7 @@ export function useSheetEditor({
       // later, and the button looked as if it simply did nothing.
       if (failure) setError(failure);
     },
-    [reload],
+    [reload, saves],
   );
 
   // --- gestures -----------------------------------------------------------
@@ -480,7 +496,16 @@ export function useSheetEditor({
   const selected = items.find((a) => a.id === selectedId) ?? null;
 
   const update = useCallback(
-    (previous, next, label) => run(() => editor.update(previous, next, label)),
+    (previous, next, label) => {
+      // On screen at once, not after the round trip. The next edit — a field
+      // tabbed into straight away — is built from the item on screen, and
+      // building it from the copy before this edit would undo this one. It
+      // also shows what the edit means immediately: a past due date is
+      // flagged overdue as the field is left. A refused save is put right by
+      // the read that follows it.
+      setItems((list) => list.map((a) => (a.id === next.id ? next : a)));
+      return run(() => editor.update(previous, next, label));
+    },
     [editor, run],
   );
 
