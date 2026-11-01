@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { usePinchZoom } from '../gestures/usePinchZoom';
 import { PunchListPanel } from '../punchlist/PunchListPanel';
+import { useEarlierSheets } from '../punchlist/useEarlierSheets';
 
 import { useServices } from '../ServiceContainer';
 import { useSheetEditor } from '../hooks/useSheetEditor';
@@ -94,6 +95,11 @@ export function SheetViewer({
   // work out how to turn off.
   const sourceAnnotations = useSourceAnnotations(page);
   const [showSource, setShowSource] = useState(false);
+
+  // What a pin's number counts on from: the markups on the drawing's earlier
+  // sheets. With them, the sheet numbers its pins exactly as the punch list
+  // and the issued PDF do — see ordinalsOnSheet.
+  const earlierMarkups = useEarlierSheets({ documentName, pageIndex, sheetIdFor });
 
   const selectById = useCallback(
     (annotation) => editor.select(annotation.id),
@@ -224,6 +230,7 @@ export function SheetViewer({
             scale={scale}
             rotation={rotation}
             annotations={editor.visible}
+            earlierMarkups={earlierMarkups}
             sourceAnnotations={sourceAnnotations}
             showSource={showSource}
             selectedId={editor.selectedId}

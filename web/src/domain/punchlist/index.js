@@ -6,6 +6,7 @@ import { statusLabel } from './statusLabels';
 export { PunchListEntry } from './PunchListEntry';
 export { PunchListRegistry } from './PunchListRegistry';
 export { assignOrdinals } from './ordinals';
+export { ordinalsOnSheet } from './sheetOrdinals';
 export { STATUS_LABELS, statusLabel } from './statusLabels';
 export { buildTaskList, filterTaskList, taskListOptions, TaskFilter } from './TaskList';
 
