@@ -801,7 +801,7 @@ web/src/
       useAutoFocus.js          focus that survives the gesture that opened it
 
 web/scripts/
-  verify-all.mjs               npm run verify — runs every verify-*.mjs (16
+  verify-all.mjs               npm run verify — runs every verify-*.mjs (19
                                suites); `npm run verify -- photos` runs one
   verify-*.mjs                 one suite per behaviour, no framework
 
