@@ -70,6 +70,11 @@ export function useSheetEditor({
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [toolId, setToolId] = useState(() => ToolRegistry.default().getId());
+  // The markup this person last drew, once it is saved. Reported, not acted
+  // on: what happens next (back to Select, the new markup selected) is the
+  // tool latch's rule — see presentation/tools/ToolLatch. `seq` makes two
+  // creations two different values even if nothing else about them differs.
+  const [lastCreated, setLastCreated] = useState(null);
   const [style, setStyle] = useState(() => new MarkupStyle());
   const [draft, setDraft] = useState(null);
   const [moving, setMoving] = useState(null);
@@ -412,7 +417,9 @@ export function useSheetEditor({
           setDraftBoth(null);
           void run(async () => {
             const finalized = reader.finalizeDraft(tool, created);
-            if (finalized) await editor.add(finalized);
+            if (!finalized) return;
+            await editor.add(finalized);
+            setLastCreated((last) => ({ id: finalized.id, seq: (last?.seq ?? 0) + 1 }));
           });
           return;
         }
@@ -481,7 +488,9 @@ export function useSheetEditor({
     setDraftBoth(null);
     void run(async () => {
       const finalized = reader.finalizeDraft(tool, current);
-      if (finalized) await editor.add(finalized);
+      if (!finalized) return;
+      await editor.add(finalized);
+      setLastCreated((last) => ({ id: finalized.id, seq: (last?.seq ?? 0) + 1 }));
     });
     return false;
   }, [reader, editor, tool, run, setDraftBoth, setMovingBoth]);
@@ -588,6 +597,11 @@ export function useSheetEditor({
     toolId: tool.getId(),
     selectTool: setToolId,
     canUseTool,
+    /**
+     * `{ id, seq }` of the markup this person last drew, set once it is saved
+     * — never by undo, redo, a move or an edit. Null until the first one.
+     */
+    created: lastCreated,
     style,
     setStyle,
 

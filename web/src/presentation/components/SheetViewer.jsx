@@ -6,6 +6,7 @@ import { useEarlierSheets } from '../punchlist/useEarlierSheets';
 
 import { useServices } from '../ServiceContainer';
 import { useSheetEditor } from '../hooks/useSheetEditor';
+import { useToolLatch } from '../tools/useToolLatch';
 import { useTextPrompt } from './PromptDialog';
 import { usePhotoCapture } from './PhotoCaptureDialog';
 import { useSourceAnnotations } from '../hooks/useSourceAnnotations';
@@ -76,6 +77,9 @@ export function SheetViewer({
     promptForText,
     capturePhoto,
   });
+  // Tools are used once, then the app is back on Select with the new markup
+  // open — unless a tool was double-clicked to keep it on.
+  const latch = useToolLatch(editor);
 
   // Two fingers zoom and pan; one finger still draws. The hook only asks for a
   // new scale through onZoomTo — everything below keeps consuming `scale` the
@@ -184,12 +188,13 @@ export function SheetViewer({
         if (editor.lockFor(editor.selected).allowed) editor.remove(editor.selected);
         return;
       }
-      if (event.key === 'Escape') editor.select(null);
+      // Escape clears the selection and puts down whatever tool is in hand.
+      if (event.key === 'Escape') latch.escape();
     };
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [editor]);
+  }, [editor, latch]);
 
   return (
     <>
@@ -198,7 +203,9 @@ export function SheetViewer({
 
       <ToolPalette
         activeToolId={editor.toolId}
-        onSelectTool={editor.selectTool}
+        onSelectTool={latch.press}
+        onLockTool={latch.hold}
+        lockedToolId={latch.lockedToolId}
         style={editor.style}
         onChangeStyle={editor.setStyle}
         canUndo={editor.canUndo}
