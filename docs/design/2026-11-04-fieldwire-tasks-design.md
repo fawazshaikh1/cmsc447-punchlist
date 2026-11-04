@@ -15,7 +15,8 @@ safe way back from mistakes.
 
 1. Placing a pin leaves the app on Select with the new item open; no trip to
    the tool rail.
-2. Sheets read "A-101 · Level 1 Floor Plan", not "Sheet 1".
+2. Sheets read "A-101 · LEVEL 1 FLOOR PLAN" (as printed on the drawing), not
+   "Sheet 1".
 3. A Tasks tab lists every task in the project, sorted or grouped by sheet,
    filterable, with priority, history, bulk edit and CSV export. A task can be
    created on a sheet or off a sheet.
@@ -72,11 +73,15 @@ adding a seam rather than a feature:
 
 | File | Edit | Why it cannot be a new file |
 |---|---|---|
-| `presentation/hooks/useSheetEditor.js` | Report each successful create (`onCreated`) | Only the editor knows when a draft became an item. The return-to-Select rule itself lives in a new `ToolLatch`. |
+| `presentation/hooks/useSheetEditor.js` | Report each successful create (`created`) | Only the editor knows when a draft became an item. The return-to-Select rule itself lives in a new `ToolLatch`. |
+| `presentation/components/ToolPalette.jsx` | Lock a tool (double-click, long-press), lock badge, shortcut in the tooltip | The rail is the only place a tool is pressed. |
+| `presentation/components/SheetViewer.jsx` | Use the tool latch and shortcuts; Escape returns to Select | Its rail props and keyboard handler are where tools meet the sheet. |
+| `presentation/components/Toolbar.jsx` | Sheet picker shows labels; admin "Rename sheet" button | The picker lives there. |
+| `presentation/components/Icon.jsx` | New icons (edit, star) | Icons are one fixed map. |
 | `App.jsx` | Render the Sheets/Tasks switch and Bookmarks menu, hold which view is on screen | The composition of top-level views is App's job. |
 | `domain/services/EditorService.js` | `applyAll(changes, label)`: several updates as one command | Bulk edit must stay on the one write path, checked, recorded and undoable as one step. |
 | `domain/policy/SealedByExportPolicy.js` | Allow the `comment` intent on issued items | A comment does not change the item; the conversation continues after handover. |
-| `domain/punchlist/PunchListEntry.js`, `TaskList.js`, and the export call that builds the schedule | Take the sheet label from a `SheetNames` lookup, falling back to "Sheet N" | Today the label is computed inline from the page index. |
+| `domain/punchlist/PunchListEntry.js`, `PunchListRegistry.js`, `TaskList.js`, `presentation/punchlist/PunchListPanel.jsx`, `domain/services/ExportService.js`, `presentation/hooks/useExport.js` | Carry the sheet number from `SheetNames` to the punch list and the issued schedule, falling back to "Sheet N" | Today each of them computes "Sheet N" inline from the page index. |
 | `backend/history.go` | `ReplyTo` on change records | Replies point at their parent comment. |
 | `backend/history.go` (`handleSealedIds`) | Skip exports that were voided | Un-issue must unlock what the voided issue sealed. |
 
@@ -102,9 +107,9 @@ additive.
   only, and the shortcuts for tools they cannot use do nothing.
 
 **Design.** `presentation/tools/ToolLatch.js` (pure: `{toolId, locked}` and
-the transitions above) and `useToolLatch` hold the rule. `useSheetEditor` gains
-an `onCreated(annotation)` callback; the latch answers it by selecting the
-default tool unless locked. Shortcuts come from `ToolShortcutRegistry`
+the transitions above) and `useToolLatch` hold the rule. `useSheetEditor`
+reports `created` (the markup just made); the latch answers it by selecting
+the default tool and the new markup, unless the tool is locked. Shortcuts come from `ToolShortcutRegistry`
 (presentation, keyed by tool id, registered in a barrel) so a new tool brings
 its own key without editing a switch.
 
@@ -113,10 +118,11 @@ and role-limited rails) and in the browser on desktop and a phone-sized view.
 
 ### 5.2 Real sheet numbers and titles
 
-- Each page is labelled from its title block: number (A-101) and title (Level
-  1 Floor Plan). Where nothing is found the label stays "Sheet 3".
-- Labels appear in the sheet picker, the punch list, the Tasks tab, bookmarks,
-  and the issued PDF's schedule (the Sheet column reads A-101).
+- Each page is labelled from its title block: number (A-101) and title (LEVEL
+  1 FLOOR PLAN, as printed). Where nothing is found the label stays "Sheet 3".
+- The sheet picker, the Tasks tab and bookmarks show number and title; the
+  punch list and the issued PDF's schedule, where space is short, show the
+  number alone (the Sheet column reads A-101).
 - An admin can correct a label from the sheet picker ("Rename sheet"). A
   correction wins over detection and is never overwritten by it.
 
@@ -138,9 +144,11 @@ sheet from rendering. Until then everyone sees "Sheet N".
 **Storage.** Table `sheet_names (document_id, page_index, number, title,
 source 'detected'|'edited', updated_by, updated_at)`, primary key
 `(document_id, page_index)`.
-`GET /api/projects/{p}/documents/{d}/sheets` returns them;
-`PUT` the same path saves detected labels (admin or power collaborator; fills
-only pages without a label) or one edited label (admin only).
+`GET /api/projects/{p}/sheet-names` returns every drawing's labels, keyed by
+drawing name, in one call (the punch list spans drawings).
+`PUT /api/projects/{p}/sheet-names/{drawing name}` saves detected labels
+(admin or power collaborator; fills only pages without a label) or an edited
+label (admin only; replaces whatever was there).
 
 **Domain.** `SheetName` (value object) and `SheetNames` (`labelFor(pageIndex)`,
 `numberFor(pageIndex)`), used wherever a sheet is named.
