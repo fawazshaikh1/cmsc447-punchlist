@@ -88,6 +88,9 @@ func routes() http.Handler {
 	mux.HandleFunc("POST /api/projects/{projectID}/documents", handleAddDocument)
 	mux.HandleFunc("GET /api/projects/{projectID}/documents/{documentID}", handleGetDocument)
 	mux.HandleFunc("DELETE /api/projects/{projectID}/documents/{documentID}", handleDeleteDocument)
+	// Sheet names (sheet_names.go).
+	mux.HandleFunc("GET /api/projects/{projectID}/sheet-names", handleListSheetNames)
+	mux.HandleFunc("PUT /api/projects/{projectID}/sheet-names/{documentName}", handleSaveSheetNames)
 
 	return withCORS(requireAppRequest(mux))
 }
