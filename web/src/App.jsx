@@ -36,6 +36,8 @@ import './domain/details';
 // Registers the flags the sheet and panel highlight — today, overdue items.
 import './domain/flags';
 import './presentation/components/markers';
+// Registers the key that picks each tool — V Select, P Pin, B Box and so on.
+import './presentation/tools';
 
 /**
  * Application shell.

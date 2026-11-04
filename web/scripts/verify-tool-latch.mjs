@@ -10,6 +10,9 @@
  *    back to the rail for Select after every pin.
  * 2. A TOOL CAN BE KEPT ON for placing several in a row, and every way out of
  *    that — pressing the tool again, pressing another, Escape — releases it.
+ * 3. EVERY TOOL HAS A KEY (V P B C A D T I), and a key never does anything
+ *    while someone is typing, when it is part of a Ctrl/Cmd/Alt shortcut, or
+ *    for a tool the person's role does not offer them.
  *
  * Which tool a role may use is not decided here: the rail and the editor
  * already ask the policy, and these rules only ever move between tools the
@@ -20,6 +23,7 @@
 import assert from 'node:assert/strict';
 
 import { afterCreate, escapeTool, holdTool, pressTool } from '../src/presentation/tools/ToolLatch.js';
+import { ToolShortcutRegistry, shortcutTarget } from '../src/presentation/tools/index.js';
 
 const checks = [];
 const check = (name, fn) => checks.push([name, fn]);
@@ -70,6 +74,44 @@ check('Escape returns to Select and releases any lock', () =>
 
 check('every answer is frozen', () =>
   assert.ok(Object.isFrozen(pressTool({ toolId: 'select', lockedToolId: null }, 'pin'))));
+
+// =========================================================================
+// 3. SHORTCUTS
+// =========================================================================
+
+check('V P B C A D T I pick their tools', () => {
+  const expected = { v: 'select', p: 'pin', b: 'rectangle', c: 'cloud', a: 'arrow', d: 'ink', t: 'text', i: 'photo' };
+  for (const [key, tool] of Object.entries(expected)) assert.equal(ToolShortcutRegistry.toolFor(key), tool, key);
+  assert.equal(ToolShortcutRegistry.keyFor('ink'), 'D');
+});
+
+const any = { isAvailable: () => true };
+
+check('a shortcut is ignored while typing', () => {
+  for (const target of [
+    { tagName: 'INPUT' },
+    { tagName: 'TEXTAREA' },
+    { tagName: 'SELECT' },
+    { tagName: 'DIV', isContentEditable: true },
+  ]) {
+    assert.equal(shortcutTarget({ key: 'p', target }, any), null, target.tagName);
+  }
+});
+
+check('Ctrl, Cmd or Alt with a letter is not a tool', () => {
+  assert.equal(shortcutTarget({ key: 'c', ctrlKey: true, target: { tagName: 'BODY' } }, any), null);
+  assert.equal(shortcutTarget({ key: 'c', metaKey: true, target: { tagName: 'BODY' } }, any), null);
+  assert.equal(shortcutTarget({ key: 'c', altKey: true, target: { tagName: 'BODY' } }, any), null);
+});
+
+check('a tool the role cannot use is not picked', () => {
+  const collaborator = { isAvailable: (id) => id === 'select' || id === 'photo' };
+  assert.equal(shortcutTarget({ key: 'b', target: { tagName: 'BODY' } }, collaborator), null);
+  assert.equal(shortcutTarget({ key: 'I', target: { tagName: 'BODY' } }, collaborator), 'photo');
+});
+
+check('an unregistered key picks nothing', () =>
+  assert.equal(shortcutTarget({ key: 'x', target: { tagName: 'BODY' } }, any), null));
 
 // --- run --------------------------------------------------------------------
 

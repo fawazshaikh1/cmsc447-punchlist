@@ -6,7 +6,9 @@ import { useEarlierSheets } from '../punchlist/useEarlierSheets';
 
 import { useServices } from '../ServiceContainer';
 import { useSheetEditor } from '../hooks/useSheetEditor';
+import { ToolShortcutRegistry } from '../tools/ToolShortcutRegistry';
 import { useToolLatch } from '../tools/useToolLatch';
+import { useToolShortcuts } from '../tools/useToolShortcuts';
 import { useTextPrompt } from './PromptDialog';
 import { usePhotoCapture } from './PhotoCaptureDialog';
 import { useSourceAnnotations } from '../hooks/useSourceAnnotations';
@@ -80,6 +82,7 @@ export function SheetViewer({
   // Tools are used once, then the app is back on Select with the new markup
   // open — unless a tool was double-clicked to keep it on.
   const latch = useToolLatch(editor);
+  useToolShortcuts({ editor, latch });
 
   // Two fingers zoom and pan; one finger still draws. The hook only asks for a
   // new scale through onZoomTo — everything below keeps consuming `scale` the
@@ -206,6 +209,7 @@ export function SheetViewer({
         onSelectTool={latch.press}
         onLockTool={latch.hold}
         lockedToolId={latch.lockedToolId}
+        shortcutFor={(id) => ToolShortcutRegistry.keyFor(id)}
         style={editor.style}
         onChangeStyle={editor.setStyle}
         canUndo={editor.canUndo}
