@@ -13,12 +13,17 @@
  *    numbers, dimensions, dates, or a note saying "SEE A-501".
  * 3. A NAME SOMEONE TYPED IS NEVER OVERWRITTEN by a later reading of the
  *    drawing, and a page with no name reads "Sheet N" as it always has.
+ * 4. THE ADAPTERS CARRY THIS FAITHFULLY: pdf.js text positions become the
+ *    page-as-seen positions the reader expects, on a turned page too, and
+ *    names reach the server under the drawing's name, escaped.
  *
  * Run with: npm run verify -- sheet-names
  */
 import assert from 'node:assert/strict';
 
 import { SheetName, SheetNames, findSheetName } from '../src/domain/sheets/index.js';
+import { toSheetTextItems } from '../src/infrastructure/pdf/sheetTextItems.js';
+import { HttpSheetNameRepository } from '../src/infrastructure/sheets/HttpSheetNameRepository.js';
 
 const checks = [];
 const check = (name, fn) => checks.push([name, fn]);
@@ -113,6 +118,57 @@ check('names are tidied, capped and checked', () => {
   assert.throws(() => new SheetName({ pageIndex: -1 }), TypeError);
   assert.throws(() => new SheetName({ pageIndex: 0, source: 'guessed' }), TypeError);
   assert.deepEqual(SheetName.fromJSON(name.toJSON()), name);
+});
+
+// =========================================================================
+// 4. THE ADAPTERS
+// =========================================================================
+
+check('pdf.js positions become top-left page positions on an upright page', () =>
+  // pdf.js puts A-101 26 pt high with its baseline 48 pt up the page; the
+  // upright viewport flips y, so its top edge is 1728 - 48 - 26 from the top.
+  assert.deepEqual(toSheetTextItems([{ str: 'A-101', transform: [26, 0, 0, 26, 2322, 48] }], [1, 0, 0, -1, 0, 1728]), [
+    { text: 'A-101', x: 2322, y: 1654, size: 26 },
+  ]));
+
+check('…and on a page turned 90 degrees', () => {
+  const [item] = toSheetTextItems([{ str: 'A-101', transform: [26, 0, 0, 26, 2322, 48] }], [0, 1, 1, 0, 0, 0]);
+  assert.equal(item.x, 48);
+  assert.equal(item.size, 26);
+});
+
+/** A drawing name that needs escaping in a path: spaces, '%' and '&'. */
+const DRAWING = 'A-101 100% CD set & stairs.pdf';
+
+check('the HTTP adapter reads every drawing and saves one', async () => {
+  const requests = [];
+  const bodies = [];
+  const fake = async (url, init = {}) => {
+    const method = init.method ?? 'GET';
+    requests.push(`${method} ${new URL(url, 'http://localhost').pathname}`);
+    if (init.body) bodies.push(JSON.parse(init.body));
+    const body =
+      method === 'GET'
+        ? { [DRAWING]: [{ pageIndex: 0, number: 'A-101', title: 'LEVEL 1 FLOOR PLAN', source: 'detected' }] }
+        : [
+            { pageIndex: 0, number: 'A-101', title: 'LEVEL 1 FLOOR PLAN', source: 'detected' },
+            { pageIndex: 1, number: 'A-102', title: '', source: 'detected' },
+          ];
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+
+  const repo = new HttpSheetNameRepository('/api', fake);
+  const all = await repo.listForProject(7);
+  assert.equal(all.get(DRAWING).numberFor(0), 'A-101');
+  assert.equal(requests.at(-1), 'GET /api/projects/7/sheet-names');
+
+  const saved = await repo.save(7, DRAWING, {
+    source: 'detected',
+    names: [new SheetName({ pageIndex: 1, number: 'A-102' })],
+  });
+  assert.equal(requests.at(-1), 'PUT /api/projects/7/sheet-names/A-101%20100%25%20CD%20set%20%26%20stairs.pdf');
+  assert.deepEqual(bodies.at(-1), { source: 'detected', names: [{ pageIndex: 1, number: 'A-102', title: '' }] });
+  assert.equal(saved.numberFor(1), 'A-102');
 });
 
 // --- run --------------------------------------------------------------------
