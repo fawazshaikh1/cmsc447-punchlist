@@ -40,6 +40,8 @@ export function SheetViewer({
   pageIndex = 0,
   pageCount = 1,
   sheetIdFor = () => sheetId,
+  // What the punch list calls a sheet — "A-101", or "Sheet N".
+  sheetNumberFor = (drawing, index) => `Sheet ${index + 1}`,
   onSelectPage = () => {},
 }) {
   // How a tool that declares `requiresText()` gets its text. Owned here rather
@@ -300,6 +302,7 @@ export function SheetViewer({
             documentName={documentName}
             pageCount={pageCount}
             sheetIdFor={sheetIdFor}
+            sheetNumberFor={sheetNumberFor}
             changeKey={editor.annotations}
             onGo={goToItem}
           />

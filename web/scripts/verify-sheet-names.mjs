@@ -21,7 +21,15 @@
  */
 import assert from 'node:assert/strict';
 
+import '../src/domain/annotations/index.js';
+import '../src/domain/details/index.js';
+import '../src/domain/flags/index.js';
+import { Pin, PinStatus } from '../src/domain/annotations/Pin.js';
+import { CalendarDate } from '../src/domain/details/CalendarDate.js';
+import { PdfPoint } from '../src/domain/geometry/PdfPoint.js';
+import { buildTaskList } from '../src/domain/punchlist/index.js';
 import { SheetName, SheetNames, findSheetName } from '../src/domain/sheets/index.js';
+import { readSheetNames } from '../src/infrastructure/pdf/readSheetNames.js';
 import { toSheetTextItems } from '../src/infrastructure/pdf/sheetTextItems.js';
 import { HttpSheetNameRepository } from '../src/infrastructure/sheets/HttpSheetNameRepository.js';
 
@@ -137,6 +145,33 @@ check('…and on a page turned 90 degrees', () => {
   assert.equal(item.size, 26);
 });
 
+check('the reader names each page and lets pdf.js go through its loading task', async () => {
+  // pdf.js 6 has no destroy() on the document — only on the loading task. The
+  // first version of the reader called the document's and threw, so no
+  // drawing was ever named (found in the browser, 2026-11-04).
+  let released = false;
+  const page = {
+    getViewport: () => ({ transform: [1, 0, 0, -1, 0, 1728], width: 2592, height: 1728 }),
+    getTextContent: async () => ({
+      items: [
+        { str: 'SHEET NUMBER', transform: [6.5, 0, 0, 6.5, 2322, 82] },
+        { str: 'A-101', transform: [26, 0, 0, 26, 2322, 48] },
+      ],
+    }),
+    cleanup() {},
+  };
+  const loadingTask = {
+    promise: Promise.resolve({ numPages: 2, getPage: async () => page }),
+    destroy: async () => {
+      released = true;
+    },
+  };
+
+  const names = await readSheetNames(loadingTask);
+  assert.deepEqual(names.map((name) => [name.pageIndex, name.number]), [[0, 'A-101'], [1, 'A-101']]);
+  assert.equal(released, true);
+});
+
 /** A drawing name that needs escaping in a path: spaces, '%' and '&'. */
 const DRAWING = 'A-101 100% CD set & stairs.pdf';
 
@@ -169,6 +204,25 @@ check('the HTTP adapter reads every drawing and saves one', async () => {
   assert.equal(requests.at(-1), 'PUT /api/projects/7/sheet-names/A-101%20100%25%20CD%20set%20%26%20stairs.pdf');
   assert.deepEqual(bodies.at(-1), { source: 'detected', names: [{ pageIndex: 1, number: 'A-102', title: '' }] });
   assert.equal(saved.numberFor(1), 'A-102');
+});
+
+// =========================================================================
+// 5. WHERE THE NAMES ARE SHOWN
+// =========================================================================
+
+const TODAY = CalendarDate.parse('2026-11-04');
+let clock = 0;
+const pinOnPage = (page) =>
+  new Pin(`pin-${page}`, `set.pdf#${page}`, new PdfPoint(100, 100), `Item on page ${page + 1}`, PinStatus.OPEN,
+    new Date(Date.UTC(2026, 10, 1, 12, 0, clock++)));
+
+check('punch list items carry the sheet number they are given, or Sheet N', () => {
+  const groups = buildTaskList([pinOnPage(0), pinOnPage(1)], {
+    today: TODAY,
+    openDocument: 'set.pdf',
+    sheetLabelFor: (documentName, page) => (page === 0 ? 'A-101' : `Sheet ${page + 1}`),
+  });
+  assert.deepEqual(groups[0].items.map((item) => item.sheetLabel), ['A-101', 'Sheet 2']);
 });
 
 // --- run --------------------------------------------------------------------

@@ -1,0 +1,22 @@
+/* =========================================================================
+   SHEET NAMES IN THE PICKER — see presentation/sheets/useSheetNames
+   ========================================================================= */
+
+/* "A-201 · EXTERIOR ELEVATIONS" is twice as long as "Sheet 3 of 4". Where the
+   bar is short of room the dropdown gives way and ends in an ellipsis, rather
+   than pushing the picker under the zoom controls beside it.
+
+   The percentage width is what lets it give way: a select sized in percent
+   counts as compressible, so its smallest size is its min-width, not the
+   width of its longest sheet name. The arrows beside it keep their size. */
+.sheet-nav {
+  flex: 0 1 auto;
+}
+
+.sheet-nav select {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 5rem;
+  max-width: 20rem;
+  text-overflow: ellipsis;
+}

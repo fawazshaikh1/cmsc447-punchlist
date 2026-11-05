@@ -41,6 +41,8 @@ import { statusLabel } from './statusLabels';
  * @property {string} sheetId
  * @property {string} documentName
  * @property {number} pageIndex
+ * @property {string} sheetLabel How the sheet is named — "A-101", or
+ *           "Sheet 3" where no name is known (see domain/sheets).
  * @property {number} number Matches the pin and the schedule.
  * @property {string} description
  * @property {string} statusKey e.g. 'open'
@@ -65,9 +67,12 @@ import { statusLabel } from './statusLabels';
  * @param {object} context
  * @param {import('../details/CalendarDate').CalendarDate} context.today
  * @param {string|null} [context.openDocument] The drawing on screen; listed first.
+ * @param {(documentName: string, pageIndex: number) => string} [context.sheetLabelFor]
+ *        What to call a sheet — its number, where one is known. "Sheet N"
+ *        otherwise, which is also all a browser-mode list can know.
  * @returns {TaskListGroup[]}
  */
-export function buildTaskList(annotations, { today, openDocument = null }) {
+export function buildTaskList(annotations, { today, openDocument = null, sheetLabelFor = defaultSheetLabel }) {
   /** @type {Map<string, Map<number, import('../annotations/Annotation').Annotation[]>>} */
   const byDocument = new Map();
 
@@ -89,9 +94,12 @@ export function buildTaskList(annotations, { today, openDocument = null }) {
       .map(([pageIndex, list]) => ({ pageIndex, annotations: list }));
     const ordinals = assignOrdinals(pages);
 
-    const items = pages.flatMap(({ pageIndex, annotations: list }) =>
-      list.map((annotation) => itemFrom(annotation, { documentName, pageIndex, number: ordinals.get(annotation), today })),
-    );
+    const items = pages.flatMap(({ pageIndex, annotations: list }) => {
+      const sheetLabel = sheetLabelFor(documentName, pageIndex);
+      return list.map((annotation) =>
+        itemFrom(annotation, { documentName, pageIndex, sheetLabel, number: ordinals.get(annotation), today }),
+      );
+    });
     groups.push({ documentName, isOpen: documentName === openDocument, items });
   }
 
@@ -100,7 +108,11 @@ export function buildTaskList(annotations, { today, openDocument = null }) {
   return groups.sort((a, b) => Number(b.isOpen) - Number(a.isOpen) || a.documentName.localeCompare(b.documentName));
 }
 
-function itemFrom(annotation, { documentName, pageIndex, number, today }) {
+function defaultSheetLabel(documentName, pageIndex) {
+  return `Sheet ${pageIndex + 1}`;
+}
+
+function itemFrom(annotation, { documentName, pageIndex, sheetLabel, number, today }) {
   const detail = (key) =>
     typeof annotation.details?.get === 'function' ? annotation.details.get(key) ?? '' : '';
   const statusKey = typeof annotation.status === 'string' ? annotation.status : PinStatus.OPEN;
@@ -110,6 +122,7 @@ function itemFrom(annotation, { documentName, pageIndex, number, today }) {
     sheetId: annotation.sheetId,
     documentName,
     pageIndex,
+    sheetLabel,
     number,
     description: typeof annotation.label === 'string' ? annotation.label.trim() : '',
     statusKey,

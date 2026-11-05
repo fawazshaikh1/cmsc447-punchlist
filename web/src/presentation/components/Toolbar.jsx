@@ -1,4 +1,8 @@
 import { Icon } from './Icon';
+import '../sheets/sheets.css';
+
+/** The picker's "Rename this sheet…" entry — never a page index. */
+const RENAME = 'rename';
 
 /**
  * The top bar: which drawing is open, which sheet, how it is being looked at,
@@ -37,6 +41,10 @@ import { Icon } from './Icon';
  * @param {() => void} [props.onExportFlat] Omitted when the signed-in role may
  *        not issue a flattened PDF, which hides the button.
  * @param {boolean} [props.isExporting]
+ * @param {(pageIndex: number) => string} [props.sheetLabelFor] What each sheet
+ *        is called — "A-101 · LEVEL 1 FLOOR PLAN" — or "Sheet N".
+ * @param {() => void} [props.onRenameSheet] Offered to an admin only, as the
+ *        last entry in the sheet picker; omitted, the entry is not there.
  * @param {React.ReactNode} [props.children] Shown at the end of the bar —
  *        the account menu in server mode. A slot, so what sits there is the
  *        app shell's choice and this component needs no edit to change it.
@@ -57,6 +65,8 @@ export function Toolbar({
   onExport,
   onExportFlat,
   isExporting,
+  sheetLabelFor = (index) => `Sheet ${index + 1}`,
+  onRenameSheet,
   children,
 }) {
   const handleFileChange = (event) => {
@@ -117,14 +127,33 @@ export function Toolbar({
 
             <select
               value={pageIndex}
-              onChange={(event) => onSelectPage(Number(event.target.value))}
+              onChange={(event) => {
+                // "Rename this sheet…" is an action, not a page: it opens the
+                // dialog and the picker stays on the sheet it was showing.
+                if (event.target.value === RENAME) onRenameSheet?.();
+                else onSelectPage(Number(event.target.value));
+              }}
               aria-label="Sheet"
             >
-              {Array.from({ length: pageCount }, (_, index) => (
-                <option key={index} value={index}>
-                  Sheet {index + 1} of {pageCount}
-                </option>
-              ))}
+              {Array.from({ length: pageCount }, (_, index) => {
+                // The sheet's own name where it has one — "A-101 · LEVEL 1
+                // FLOOR PLAN" — and the set position where it does not.
+                const label = sheetLabelFor(index);
+                return (
+                  <option key={index} value={index}>
+                    {label === `Sheet ${index + 1}` ? `Sheet ${index + 1} of ${pageCount}` : label}
+                  </option>
+                );
+              })}
+              {/* In the picker rather than beside it: the bar has no width to
+                  spare at laptop sizes, and a touch device's native picker
+                  then offers it too. Admins only (spec 5.2). */}
+              {onRenameSheet && (
+                <>
+                  <option disabled>──────────</option>
+                  <option value={RENAME}>Rename this sheet…</option>
+                </>
+              )}
             </select>
 
             <button
