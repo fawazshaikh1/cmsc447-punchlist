@@ -23,6 +23,7 @@
 import assert from 'node:assert/strict';
 
 import { afterCreate, escapeTool, holdTool, pressTool } from '../src/presentation/tools/ToolLatch.js';
+import { HoldGesture } from '../src/presentation/tools/HoldGesture.js';
 import { ToolShortcutRegistry, shortcutTarget } from '../src/presentation/tools/index.js';
 
 const checks = [];
@@ -70,10 +71,63 @@ check('pressing the locked tool again releases the lock and keeps the tool', () 
   assert.deepEqual(pressTool({ toolId: 'pin', lockedToolId: 'pin' }, 'pin'), { toolId: 'pin', lockedToolId: null }));
 
 check('Escape returns to Select and releases any lock', () =>
-  assert.deepEqual(escapeTool({ toolId: 'pin', lockedToolId: 'pin' }, 'select'), { toolId: 'select', lockedToolId: null }));
+  assert.deepEqual(escapeTool({ toolId: 'pin', lockedToolId: 'pin' }, 'select'), {
+    toolId: 'select',
+    lockedToolId: null,
+    cancelDraft: false,
+  }));
 
 check('every answer is frozen', () =>
   assert.ok(Object.isFrozen(pressTool({ toolId: 'select', lockedToolId: null }, 'pin'))));
+
+// =========================================================================
+// 2b. WHILE A MARKUP IS BEING DRAWN
+// =========================================================================
+// Spec 5.1: a draft that is cancelled — Escape mid-drag — leaves the tool as
+// it was. Found in the final review: Escape mid-drag switched to Select, the
+// half-drawn box froze, and letting go saved it.
+
+check('Escape while a markup is being drawn drops it and keeps the tool and its lock', () =>
+  assert.deepEqual(escapeTool({ toolId: 'rectangle', lockedToolId: 'rectangle' }, 'select', { drafting: true }), {
+    toolId: 'rectangle',
+    lockedToolId: 'rectangle',
+    cancelDraft: true,
+  }));
+
+check('a tool pressed or held while a markup is being drawn changes nothing', () => {
+  const drawing = { toolId: 'rectangle', lockedToolId: null };
+  assert.deepEqual(pressTool(drawing, 'select', { drafting: true }), drawing);
+  assert.deepEqual(holdTool(drawing, 'cloud', { drafting: true }), drawing);
+});
+
+// =========================================================================
+// 2c. A FINGER RESTING ON A TOOL
+// =========================================================================
+// A long press keeps a tool on, and the click a browser sends when that
+// finger lifts must not then press the tool again. Found in the final review:
+// where no click follows — Android sends a context menu instead, iOS may
+// cancel the touch — the next tap on the rail was eaten.
+
+check('an ordinary tap on a tool acts', () => {
+  const finger = new HoldGesture();
+  finger.press();
+  assert.equal(finger.click(), true);
+});
+
+check('the click that ends a long press is not a second press', () => {
+  const finger = new HoldGesture();
+  finger.press();
+  finger.held();
+  assert.equal(finger.click(), false);
+});
+
+check('a long press that ends without a click does not eat the next tap', () => {
+  const finger = new HoldGesture();
+  finger.press();
+  finger.held();
+  finger.press();
+  assert.equal(finger.click(), true);
+});
 
 // =========================================================================
 // 3. SHORTCUTS

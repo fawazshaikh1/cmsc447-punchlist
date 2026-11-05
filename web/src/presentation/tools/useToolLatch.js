@@ -13,11 +13,14 @@ import { afterCreate, escapeTool, holdTool, pressTool } from './ToolLatch';
  * keeping a second copy that could disagree with it.
  *
  * @param {object} editor What useSheetEditor returns: `toolId`, `selectTool`,
- *        `select`, `selectSoon` and `created`.
+ *        `select`, `selectSoon`, `created`, `isDrawing` and `cancel`.
+ * @param {object} [options]
+ * @param {() => void} [options.onSelectCreated] Called when a markup just
+ *        made is selected, so its details can be shown where they are hidden.
  * @returns {{ lockedToolId: string|null, press: (toolId: string) => void, hold: (toolId: string) => void, escape: () => void }}
  */
-export function useToolLatch(editor) {
-  const { toolId, selectTool, select, selectSoon, created } = editor;
+export function useToolLatch(editor, { onSelectCreated } = {}) {
+  const { toolId, selectTool, select, selectSoon, created, isDrawing, cancel } = editor;
   const [lockedToolId, setLockedToolId] = useState(null);
   const defaultToolId = ToolRegistry.default().getId();
 
@@ -30,19 +33,21 @@ export function useToolLatch(editor) {
   );
 
   const press = useCallback(
-    (id) => apply(pressTool({ toolId, lockedToolId }, id)),
-    [apply, toolId, lockedToolId],
+    (id) => apply(pressTool({ toolId, lockedToolId }, id, { drafting: isDrawing })),
+    [apply, toolId, lockedToolId, isDrawing],
   );
 
   const hold = useCallback(
-    (id) => apply(holdTool({ toolId, lockedToolId }, id)),
-    [apply, toolId, lockedToolId],
+    (id) => apply(holdTool({ toolId, lockedToolId }, id, { drafting: isDrawing })),
+    [apply, toolId, lockedToolId, isDrawing],
   );
 
   const escape = useCallback(() => {
-    select(null);
-    apply(escapeTool({ toolId, lockedToolId }, defaultToolId));
-  }, [select, apply, toolId, lockedToolId, defaultToolId]);
+    const next = escapeTool({ toolId, lockedToolId }, defaultToolId, { drafting: isDrawing });
+    if (next.cancelDraft) cancel();
+    else select(null);
+    apply(next);
+  }, [select, cancel, apply, toolId, lockedToolId, defaultToolId, isDrawing]);
 
   // Each creation is answered once. `seq` grows with every markup made, so a
   // re-render — or this effect re-running because the selection callbacks
@@ -54,8 +59,11 @@ export function useToolLatch(editor) {
 
     const next = afterCreate({ toolId, lockedToolId }, defaultToolId);
     apply(next);
-    if (next.selectCreated) selectSoon(created.id);
-  }, [created, toolId, lockedToolId, defaultToolId, apply, selectSoon]);
+    if (next.selectCreated) {
+      selectSoon(created.id);
+      onSelectCreated?.();
+    }
+  }, [created, toolId, lockedToolId, defaultToolId, apply, selectSoon, onSelectCreated]);
 
   return { lockedToolId, press, hold, escape };
 }

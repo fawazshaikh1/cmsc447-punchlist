@@ -26,32 +26,49 @@
  * next?" from what is true now, so the rule can be checked without React and
  * the hook that applies it holds no rule of its own.
  *
+ * ---------------------------------------------------------------------------
+ * WHILE A MARKUP IS BEING DRAWN
+ * ---------------------------------------------------------------------------
+ * Nothing changes the tool in the middle of a draft — a box half dragged out,
+ * or a pin whose description is being asked for. Escape then drops the draft
+ * and leaves the tool as it was, lock and all (spec 5.1): the person is giving
+ * up one markup, not the tool. A key or a press is ignored until the draft is
+ * done. Switching tools mid-drag used to freeze the half-drawn box, and
+ * letting go saved it.
+ *
  * @typedef {{ toolId: string, lockedToolId: string|null }} Latch
  *          `toolId` is the tool active NOW; `lockedToolId` the one kept on, if
  *          any.
+ * @typedef {{ drafting?: boolean }} Moment Whether a markup is being drawn —
+ *          dragged out, or waiting on its description or photo.
  */
 
 /**
  * A tool pressed on the rail (or by its shortcut): it becomes active, and no
  * tool is kept on — pressing the kept tool again is how its lock is released.
+ * Ignored while a markup is being drawn.
  *
  * @param {Latch} latch
  * @param {string} toolId
+ * @param {Moment} [moment]
  * @returns {Readonly<Latch>}
  */
-export function pressTool(latch, toolId) {
+export function pressTool(latch, toolId, { drafting = false } = {}) {
+  if (drafting) return unchanged(latch);
   return Object.freeze({ toolId, lockedToolId: null });
 }
 
 /**
  * A tool held — double-clicked, or long-pressed on a touch screen: it becomes
- * active and stays on after each use.
+ * active and stays on after each use. Ignored while a markup is being drawn.
  *
  * @param {Latch} latch
  * @param {string} toolId
+ * @param {Moment} [moment]
  * @returns {Readonly<Latch>}
  */
-export function holdTool(latch, toolId) {
+export function holdTool(latch, toolId, { drafting = false } = {}) {
+  if (drafting) return unchanged(latch);
   return Object.freeze({ toolId, lockedToolId: toolId });
 }
 
@@ -73,12 +90,21 @@ export function afterCreate({ toolId, lockedToolId }, defaultToolId) {
 }
 
 /**
- * Escape: back to the default tool, and any kept tool is let go.
+ * Escape: back to the default tool, and any kept tool is let go — or, while a
+ * markup is being drawn, that draft is dropped and the tool stays as it was.
  *
  * @param {Latch} latch
  * @param {string} defaultToolId
- * @returns {Readonly<Latch>}
+ * @param {Moment} [moment]
+ * @returns {Readonly<Latch & { cancelDraft: boolean }>} `cancelDraft` says the
+ *          draft in progress is to be dropped.
  */
-export function escapeTool(latch, defaultToolId) {
-  return Object.freeze({ toolId: defaultToolId, lockedToolId: null });
+export function escapeTool(latch, defaultToolId, { drafting = false } = {}) {
+  if (drafting) return Object.freeze({ ...unchanged(latch), cancelDraft: true });
+  return Object.freeze({ toolId: defaultToolId, lockedToolId: null, cancelDraft: false });
+}
+
+/** @param {Latch} latch @returns {Readonly<Latch>} */
+function unchanged({ toolId, lockedToolId }) {
+  return Object.freeze({ toolId, lockedToolId });
 }

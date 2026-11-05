@@ -1,7 +1,8 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 
 import { ToolRegistry } from '../../domain/tools';
 import { MarkupStyle } from '../../domain/annotations';
+import { HoldGesture } from '../tools/HoldGesture';
 import { Icon } from './Icon';
 import '../tools/tools.css';
 
@@ -93,16 +94,18 @@ export function ToolPalette({
   shortcutFor = () => null,
 }) {
   // One finger at a time on the rail, so one timer is enough. A long press
-  // that locked a tool also ends in a click, which must not then unlock it.
+  // that locked a tool may end in a click, which must not then unlock it —
+  // see HoldGesture for why every press, Select's too, starts clean.
   const holdTimer = useRef(null);
-  const swallowClick = useRef(false);
+  const [finger] = useState(() => new HoldGesture());
 
-  const startHold = (event, id) => {
-    if (event.pointerType !== 'touch' || !onLockTool) return;
+  const startHold = (event, id, lockable) => {
+    finger.press();
+    if (!lockable || event.pointerType !== 'touch') return;
     clearTimeout(holdTimer.current);
     holdTimer.current = setTimeout(() => {
       holdTimer.current = null;
-      swallowClick.current = true;
+      finger.held();
       onLockTool(id);
     }, HOLD_MS);
   };
@@ -181,14 +184,10 @@ export function ToolPalette({
               aria-checked={isActive}
               className={isActive ? 'tool active' : 'tool'}
               onClick={() => {
-                if (swallowClick.current) {
-                  swallowClick.current = false;
-                  return;
-                }
-                onSelectTool(id);
+                if (finger.click()) onSelectTool(id);
               }}
               onDoubleClick={lockable ? () => onLockTool(id) : undefined}
-              onPointerDown={lockable ? (event) => startHold(event, id) : undefined}
+              onPointerDown={(event) => startHold(event, id, lockable)}
               onPointerUp={endHold}
               onPointerLeave={endHold}
               onPointerCancel={endHold}

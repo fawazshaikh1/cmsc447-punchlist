@@ -82,8 +82,11 @@ export function SheetViewer({
     capturePhoto,
   });
   // Tools are used once, then the app is back on Select with the new markup
-  // open — unless a tool was double-clicked to keep it on.
-  const latch = useToolLatch(editor);
+  // open — unless a tool was double-clicked to keep it on. Open means the
+  // panel too: at 900px and below it starts hidden, and the new markup's
+  // details were then selected behind it (spec 5.1).
+  const openPanel = useCallback(() => onPanelOpenChange(true), [onPanelOpenChange]);
+  const latch = useToolLatch(editor, { onSelectCreated: openPanel });
   useToolShortcuts({ editor, latch });
 
   // Two fingers zoom and pan; one finger still draws. The hook only asks for a
