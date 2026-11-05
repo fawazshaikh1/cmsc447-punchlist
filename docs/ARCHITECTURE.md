@@ -725,12 +725,20 @@ open, as Fieldwire and Bluebeam do.
 | `presentation/tools/useToolLatch` | applies it once per new markup — `useSheetEditor` reports each add as `created` (`{ id, seq }`) |
 | `presentation/tools/ToolShortcutRegistry` | which key picks which tool, filled in `presentation/tools/index.js` |
 | `presentation/tools/shortcutTarget`, `useToolShortcuts` | a key picks its tool unless the person is typing, holds Ctrl, Cmd or Alt, or their role does not have that tool |
+| `presentation/tools/HoldGesture` | which click only ends a long press, so it is not taken for a second press — and only that one |
 
 - **Keeping a tool on.** Double-click a tool, or hold it for half a second on a
   tablet, and it stays on; a lock shows on the button. Pressing it again
   releases the lock, and Escape returns to Select.
 - A gesture that makes nothing — a pin whose description was dismissed —
   leaves the tool on, so the person can try again.
+- **While a markup is being drawn** — dragged out, or waiting on its photo or
+  description — nothing changes the tool. Escape drops the draft and leaves
+  the tool as it was, a key waits, and a drag finishes with the tool it
+  started with even if the markup before it, still saving, sends the app back
+  to Select.
+- "Open" includes the panel: at 900px and below it starts hidden, and placing
+  a markup brings it in with the new markup's details.
 - The latch is presentation state, not a domain rule: which tool is in the
   hand means nothing to storage, export or the server. It is pure functions
   all the same, so it is checked in Node.
@@ -763,6 +771,10 @@ keeps them with the project, and uses them wherever a sheet is named.
   someone has. Only an admin renames, from the sheet picker (`edited`): a
   rename replaces the name, and no later reading overwrites it. The server
   refuses both from anyone else.
+- **A drawing still uploading.** An admin's new drawing is read while its PDF
+  is on its way to the library, and the server refuses names for a drawing it
+  does not have yet. They are shown at once and saved when the library
+  reports the drawing added (`presentation/sheets/UnsavedSheetNames`).
 - **Where the names show.** The sheet picker, the punch list ("A-101 · Open ·
   …") and the issued PDF's schedule. `ExportService` takes an optional
   `sheetLabelFor` and `PunchListRegistry` relabels each schedule entry with

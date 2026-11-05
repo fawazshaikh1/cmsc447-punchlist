@@ -58,8 +58,8 @@ easy to write.
 | **Go API persistence** | **Done** | Markups, change history and exports in Postgres (SCRUM-39, 40, 41); the sheet keeps up with teammates |
 | Offline sync | Not started | Sprint 3 |
 | **Drawings stored on the server** | **Done** | Each project keeps its PDFs; an admin's drawing is saved when opened, anyone on the project opens it from **Drawings** on any device. `go test` (4 tests), `verify -- library`, browser: second user opened it with every markup |
-| **Select by default, one-shot tools** | **Done** | A tool places one markup and hands back to Select with it open; double-click (hold on a tablet) keeps a tool on; V P B C A D T I pick tools, Esc returns to Select. `verify -- tool-latch` (13 checks); browser at three widths, three roles |
-| **Sheet numbers from the title block** | **Done** | "A-101 · LEVEL 1 FLOOR PLAN" read from each sheet once, kept with the project, renamed by an admin; in the sheet picker, the punch list and the issued schedule. `go test` (6 tests), `verify -- sheet-names` (16 checks); browser |
+| **Select by default, one-shot tools** | **Done** | A tool places one markup and hands back to Select with it open; double-click (hold on a tablet) keeps a tool on; V P B C A D T I pick tools, Esc returns to Select. `verify -- tool-latch` (18 checks); browser at three widths, three roles |
+| **Sheet numbers from the title block** | **Done** | "A-101 · LEVEL 1 FLOOR PLAN" read from each sheet once, kept with the project, renamed by an admin; in the sheet picker, the punch list and the issued schedule. `go test` (6 tests), `verify -- sheet-names` (18 checks); browser |
 | Comments and replies | Not started | Sprint 3 — the change log already has a `comment` intent |
 
 ---
@@ -165,6 +165,13 @@ first.
   phone pushing Drawings onto a fourth row: it now never goes narrower than
   "Sheet 1 of 4" did, so the bar lays out as before, and on a phone it shares
   its row.
+- **Final review, four fixes.** Escape or a tool key in the middle of a drag
+  froze the half-drawn box and letting go saved it — the draft is now
+  dropped and the tool kept. Names read while a new drawing was still
+  uploading were refused and lost — now shown at once and saved once it
+  arrives. A long press that ended without a click (Android) ate the next
+  tap on the rail. And at 900px and below a new markup was selected behind
+  the hidden panel — the panel now opens with it.
 
 Verified: 21 verify suites (`tool-latch` and `sheet-names` new), 6 new Go
 tests (39 in all, `-race`), lint, build, and the browser at 1470, 768 and
