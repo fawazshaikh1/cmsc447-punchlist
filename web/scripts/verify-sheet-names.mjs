@@ -32,6 +32,7 @@ import { SheetName, SheetNames, findSheetName } from '../src/domain/sheets/index
 import { readSheetNames } from '../src/infrastructure/pdf/readSheetNames.js';
 import { toSheetTextItems } from '../src/infrastructure/pdf/sheetTextItems.js';
 import { HttpSheetNameRepository } from '../src/infrastructure/sheets/HttpSheetNameRepository.js';
+import { UnsavedSheetNames } from '../src/presentation/sheets/UnsavedSheetNames.js';
 
 const checks = [];
 const check = (name, fn) => checks.push([name, fn]);
@@ -204,6 +205,57 @@ check('the HTTP adapter reads every drawing and saves one', async () => {
   assert.equal(requests.at(-1), 'PUT /api/projects/7/sheet-names/A-101%20100%25%20CD%20set%20%26%20stairs.pdf');
   assert.deepEqual(bodies.at(-1), { source: 'detected', names: [{ pageIndex: 1, number: 'A-102', title: '' }] });
   assert.equal(saved.numberFor(1), 'A-102');
+});
+
+/**
+ * A server that refuses names for a drawing until the drawing is in the
+ * project's library — as the real one answers 404 while the PDF is still
+ * uploading — and saves them after.
+ */
+function libraryRace() {
+  const calls = [];
+  let inLibrary = false;
+  return {
+    calls,
+    addDrawing: () => {
+      inLibrary = true;
+    },
+    async save(projectId, documentName, { names }) {
+      calls.push(`${projectId}:${documentName}`);
+      if (!inLibrary) throw new Error(`No drawing called ${documentName} in this project.`);
+      return SheetNames.EMPTY.withDetected(names);
+    },
+  };
+}
+
+const A101 = new SheetName({ pageIndex: 0, number: 'A-101', title: 'LEVEL 1 FLOOR PLAN' });
+
+// Found in the final review: an admin opening a new drawing reads its names
+// while the PDF is still on its way to the library, the save is refused, and
+// the names were dropped — nobody saw them until another session.
+check('names read before the drawing reaches the library are shown, then saved once it is there', async () => {
+  const server = libraryRace();
+  const unsaved = new UnsavedSheetNames();
+
+  const shown = await unsaved.save(server, { projectId: 7, documentName: DRAWING, known: SheetNames.EMPTY, names: [A101] });
+  assert.equal(shown.labelFor(0), 'A-101 · LEVEL 1 FLOOR PLAN');
+
+  assert.deepEqual(await unsaved.retry(server, 7), [], 'still refused, still owed');
+  server.addDrawing();
+  const [[drawing, saved]] = await unsaved.retry(server, 7);
+  assert.equal(drawing, DRAWING);
+  assert.equal(saved.numberFor(0), 'A-101');
+  assert.deepEqual(await unsaved.retry(server, 7), [], 'nothing owed any more');
+  assert.equal(server.calls.length, 3);
+});
+
+check('names owed in one project are never saved to another', async () => {
+  const server = libraryRace();
+  const unsaved = new UnsavedSheetNames();
+  await unsaved.save(server, { projectId: 7, documentName: DRAWING, known: SheetNames.EMPTY, names: [A101] });
+  server.addDrawing();
+  assert.deepEqual(await unsaved.retry(server, 8), []);
+  assert.deepEqual(server.calls, [`7:${DRAWING}`]);
 });
 
 // =========================================================================

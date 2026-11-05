@@ -3,6 +3,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { SheetName, SheetNames } from '../../domain/sheets';
 import { useServices } from '../ServiceContainer';
 import { SessionContext } from '../session/useSession';
+import { UnsavedSheetNames } from './UnsavedSheetNames';
 
 /** The roles that mark drawings up, and so may save what a drawing says. */
 const READER_ROLES = new Set(['admin', 'power_collaborator']);
@@ -29,6 +30,9 @@ const READER_ROLES = new Set(['admin', 'power_collaborator']);
  * @param {string|null} options.documentName The drawing on screen.
  * @param {Blob|null} options.sourceFile Its PDF.
  * @param {number} options.pageCount
+ * @param {number} [options.libraryVersion] useLibrary's `version`: when it
+ *        changes, names refused because their drawing was still uploading are
+ *        saved again.
  * @returns {{
  *   labelFor: (pageIndex: number) => string,
  *   numberFor: (documentName: string, pageIndex: number) => string,
@@ -37,8 +41,11 @@ const READER_ROLES = new Set(['admin', 'power_collaborator']);
  *   rename: (pageIndex: number, name: { number: string, title: string }) => Promise<void>,
  * }}
  */
-export function useSheetNames({ documentName, sourceFile, pageCount }) {
+export function useSheetNames({ documentName, sourceFile, pageCount, libraryVersion = 0 }) {
   const { sheetNames: repository, sheetNameDetector: detector } = useServices();
+  // Names the server refused because their drawing had not reached the
+  // library yet — shown, and saved once it has.
+  const [unsaved] = useState(() => new UnsavedSheetNames());
   const project = useContext(SessionContext)?.project ?? null;
   const projectId = project?.id ?? null;
   const role = project?.role ?? null;
@@ -101,7 +108,7 @@ export function useSheetNames({ documentName, sourceFile, pageCount }) {
         if (fresh.length === 0) return;
 
         const saved = repository
-          ? await repository.save(projectId, documentName, { source: SheetName.SOURCE.DETECTED, names: fresh })
+          ? await unsaved.save(repository, { projectId, documentName, known, names: fresh })
           : known.withDetected(fresh);
         setState((previous) => {
           const base = previous.projectId === projectId ? previous : latest.current;
@@ -123,7 +130,26 @@ export function useSheetNames({ documentName, sourceFile, pageCount }) {
       controller.abort();
       attempts.delete(key);
     };
-  }, [documentName, sourceFile, pageCount, current.loaded, mayRead, projectId, repository, detector]);
+  }, [documentName, sourceFile, pageCount, current.loaded, mayRead, projectId, repository, detector, unsaved]);
+
+  // The library changed here — most often the drawing just read has finished
+  // uploading — so names it refused a moment ago can be saved now.
+  useEffect(() => {
+    if (!repository || projectId === null) return undefined;
+    let live = true;
+    unsaved.retry(repository, projectId).then((saved) => {
+      if (!live || saved.length === 0) return;
+      setState((previous) => {
+        const base = previous.projectId === projectId ? previous : latest.current;
+        const byDrawing = new Map(base.byDrawing);
+        for (const [drawing, names] of saved) byDrawing.set(drawing, names);
+        return { ...base, projectId, byDrawing };
+      });
+    });
+    return () => {
+      live = false;
+    };
+  }, [repository, projectId, libraryVersion, unsaved]);
 
   const canRename = Boolean(repository) && role === 'admin';
 

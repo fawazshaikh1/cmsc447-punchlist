@@ -73,7 +73,7 @@ export default function App() {
   const [exportPrecheckError, setExportPrecheckError] = useState(null);
   // What each sheet is called — "A-101 · LEVEL 1 FLOOR PLAN" — read from the
   // title blocks, kept with the project, and renamed by an admin (spec 5.2).
-  const sheetNames = useSheetNames({ documentName, sourceFile, pageCount });
+  const sheetNames = useSheetNames({ documentName, sourceFile, pageCount, libraryVersion: library.version });
   const [renamingSheet, setRenamingSheet] = useState(false);
 
   // Whether the side panel is showing. Lives here rather than in SheetViewer
