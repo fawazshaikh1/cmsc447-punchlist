@@ -258,7 +258,7 @@ class PdfJsLoadedDocument extends LoadedDocument {
 /**
  * DocumentSource backed by Mozilla's pdf.js. TIER 3.
  *
- * This file and PdfJsCoordinateTransformer are the ONLY two in the codebase
+ * This file and PdfJsSheetNameDetector are the ONLY two in the codebase
  * that import pdfjs-dist. Everything above works against the domain contracts,
  * so replacing the render engine — or stubbing it out in a test — means writing
  * one new adapter and changing one line in the composition root.

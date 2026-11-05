@@ -76,7 +76,9 @@ export class PunchListRegistry {
    * ones, because it has to agree with the number the writer draws inside the
    * pin. Both read the same map — see `assignOrdinals`.
    *
-   * @param {{ pageIndex: number, annotations: import('../annotations/Annotation').Annotation[] }[]} pages
+   * @param {{ pageIndex: number, annotations: import('../annotations/Annotation').Annotation[], sheetLabel?: string }[]} pages
+   *        A page's `sheetLabel` — "A-101" — names the sheet on its lines;
+   *        without one they say "Sheet N".
    * @param {Map<import('../annotations/Annotation').Annotation, number>} [ordinals]
    *        Reuses the export's numbering when given one. Computing its own is
    *        only correct when nothing else has already numbered these pages.
@@ -85,13 +87,13 @@ export class PunchListRegistry {
   static collect(pages, ordinals = assignOrdinals(pages)) {
     const entries = [];
 
-    for (const { pageIndex, annotations } of pages) {
+    for (const { pageIndex, annotations, sheetLabel } of pages) {
       for (const annotation of annotations) {
         const build = this.#builders.get(annotation.getKind());
         if (!build) continue;
 
         const entry = build(annotation, { number: ordinals.get(annotation), pageIndex });
-        if (entry instanceof PunchListEntry) entries.push(entry);
+        if (entry instanceof PunchListEntry) entries.push(sheetLabel ? entry.withSheetLabel(sheetLabel) : entry);
       }
     }
 

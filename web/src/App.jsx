@@ -15,6 +15,8 @@ import { WhereWorkIsSaved } from './presentation/session/WhereWorkIsSaved';
 import { useLibrary } from './presentation/library/useLibrary';
 import { DrawingList } from './presentation/library/DrawingList';
 import { LibraryButton } from './presentation/library/LibraryButton';
+import { useSheetNames } from './presentation/sheets/useSheetNames';
+import { RenameSheetDialog } from './presentation/sheets/RenameSheetDialog';
 
 // Loading these three barrels is what registers every annotation type with
 // AnnotationRegistry, every marker component with MarkerRegistry, and every
@@ -36,6 +38,8 @@ import './domain/details';
 // Registers the flags the sheet and panel highlight — today, overdue items.
 import './domain/flags';
 import './presentation/components/markers';
+// Registers the key that picks each tool — V Select, P Pin, B Box and so on.
+import './presentation/tools';
 
 /**
  * Application shell.
@@ -67,6 +71,10 @@ export default function App() {
   // Failures from the checks that run BEFORE the export confirmation, which
   // useExport never sees because the export has not started yet.
   const [exportPrecheckError, setExportPrecheckError] = useState(null);
+  // What each sheet is called — "A-101 · LEVEL 1 FLOOR PLAN" — read from the
+  // title blocks, kept with the project, and renamed by an admin (spec 5.2).
+  const sheetNames = useSheetNames({ documentName, sourceFile, pageCount, libraryVersion: library.version });
+  const [renamingSheet, setRenamingSheet] = useState(false);
 
   // Whether the side panel is showing. Lives here rather than in SheetViewer
   // because the `.app-body` grid needs it too, to give the stage the panel's
@@ -98,10 +106,18 @@ export default function App() {
 
   const sheetId = sheetIdFor(pageIndex);
 
+  const { numberFor: sheetNumberFor } = sheetNames;
   const runExport = useCallback(
     (flatten) =>
-      void exportDocument({ sourceFile, documentName, pageCount, sheetIdFor, flatten }),
-    [exportDocument, sourceFile, documentName, pageCount, sheetIdFor],
+      void exportDocument({
+        sourceFile,
+        documentName,
+        pageCount,
+        sheetIdFor,
+        sheetLabelFor: (index) => sheetNumberFor(documentName, index),
+        flatten,
+      }),
+    [exportDocument, sourceFile, documentName, pageCount, sheetIdFor, sheetNumberFor],
   );
 
   const handleExport = useCallback(() => runExport(false), [runExport]);
@@ -175,6 +191,17 @@ export default function App() {
   return (
     <div className="app">
       {dialog}
+      {renamingSheet && (
+        <RenameSheetDialog
+          pageIndex={pageIndex}
+          name={sheetNames.nameFor(pageIndex)}
+          onSave={async (name) => {
+            await sheetNames.rename(pageIndex, name);
+            setRenamingSheet(false);
+          }}
+          onCancel={() => setRenamingSheet(false)}
+        />
+      )}
 
       <Toolbar
         fileName={fileName}
@@ -194,6 +221,8 @@ export default function App() {
         // and the server refuses it from anyone else regardless.
         onExportFlat={page && editor.canIssue().allowed ? onExportFlatClicked : undefined}
         isExporting={isExporting}
+        sheetLabelFor={sheetNames.labelFor}
+        onRenameSheet={page && sheetNames.canRename ? () => setRenamingSheet(true) : undefined}
       >
         <LibraryButton
           onOpen={(drawing) => void library.openFromLibrary(drawing)}
@@ -253,6 +282,7 @@ export default function App() {
             pageIndex={pageIndex}
             pageCount={pageCount}
             sheetIdFor={sheetIdFor}
+            sheetNumberFor={sheetNames.numberFor}
             onSelectPage={(index) => void openPage(index)}
           />
         </div>

@@ -6,6 +6,9 @@ import { useEarlierSheets } from '../punchlist/useEarlierSheets';
 
 import { useServices } from '../ServiceContainer';
 import { useSheetEditor } from '../hooks/useSheetEditor';
+import { ToolShortcutRegistry } from '../tools/ToolShortcutRegistry';
+import { useToolLatch } from '../tools/useToolLatch';
+import { useToolShortcuts } from '../tools/useToolShortcuts';
 import { useTextPrompt } from './PromptDialog';
 import { usePhotoCapture } from './PhotoCaptureDialog';
 import { useSourceAnnotations } from '../hooks/useSourceAnnotations';
@@ -37,6 +40,8 @@ export function SheetViewer({
   pageIndex = 0,
   pageCount = 1,
   sheetIdFor = () => sheetId,
+  // What the punch list calls a sheet — "A-101", or "Sheet N".
+  sheetNumberFor = (drawing, index) => `Sheet ${index + 1}`,
   onSelectPage = () => {},
 }) {
   // How a tool that declares `requiresText()` gets its text. Owned here rather
@@ -76,6 +81,13 @@ export function SheetViewer({
     promptForText,
     capturePhoto,
   });
+  // Tools are used once, then the app is back on Select with the new markup
+  // open — unless a tool was double-clicked to keep it on. Open means the
+  // panel too: at 900px and below it starts hidden, and the new markup's
+  // details were then selected behind it (spec 5.1).
+  const openPanel = useCallback(() => onPanelOpenChange(true), [onPanelOpenChange]);
+  const latch = useToolLatch(editor, { onSelectCreated: openPanel });
+  useToolShortcuts({ editor, latch });
 
   // Two fingers zoom and pan; one finger still draws. The hook only asks for a
   // new scale through onZoomTo — everything below keeps consuming `scale` the
@@ -184,12 +196,13 @@ export function SheetViewer({
         if (editor.lockFor(editor.selected).allowed) editor.remove(editor.selected);
         return;
       }
-      if (event.key === 'Escape') editor.select(null);
+      // Escape clears the selection and puts down whatever tool is in hand.
+      if (event.key === 'Escape') latch.escape();
     };
 
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
-  }, [editor]);
+  }, [editor, latch]);
 
   return (
     <>
@@ -198,7 +211,10 @@ export function SheetViewer({
 
       <ToolPalette
         activeToolId={editor.toolId}
-        onSelectTool={editor.selectTool}
+        onSelectTool={latch.press}
+        onLockTool={latch.hold}
+        lockedToolId={latch.lockedToolId}
+        shortcutFor={(id) => ToolShortcutRegistry.keyFor(id)}
         style={editor.style}
         onChangeStyle={editor.setStyle}
         canUndo={editor.canUndo}
@@ -289,6 +305,7 @@ export function SheetViewer({
             documentName={documentName}
             pageCount={pageCount}
             sheetIdFor={sheetIdFor}
+            sheetNumberFor={sheetNumberFor}
             changeKey={editor.annotations}
             onGo={goToItem}
           />
