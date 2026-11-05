@@ -106,10 +106,18 @@ export default function App() {
 
   const sheetId = sheetIdFor(pageIndex);
 
+  const { numberFor: sheetNumberFor } = sheetNames;
   const runExport = useCallback(
     (flatten) =>
-      void exportDocument({ sourceFile, documentName, pageCount, sheetIdFor, flatten }),
-    [exportDocument, sourceFile, documentName, pageCount, sheetIdFor],
+      void exportDocument({
+        sourceFile,
+        documentName,
+        pageCount,
+        sheetIdFor,
+        sheetLabelFor: (index) => sheetNumberFor(documentName, index),
+        flatten,
+      }),
+    [exportDocument, sourceFile, documentName, pageCount, sheetIdFor, sheetNumberFor],
   );
 
   const handleExport = useCallback(() => runExport(false), [runExport]);

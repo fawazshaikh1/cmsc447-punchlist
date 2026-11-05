@@ -27,7 +27,7 @@ import '../src/domain/flags/index.js';
 import { Pin, PinStatus } from '../src/domain/annotations/Pin.js';
 import { CalendarDate } from '../src/domain/details/CalendarDate.js';
 import { PdfPoint } from '../src/domain/geometry/PdfPoint.js';
-import { buildTaskList } from '../src/domain/punchlist/index.js';
+import { PunchListRegistry, buildTaskList } from '../src/domain/punchlist/index.js';
 import { SheetName, SheetNames, findSheetName } from '../src/domain/sheets/index.js';
 import { readSheetNames } from '../src/infrastructure/pdf/readSheetNames.js';
 import { toSheetTextItems } from '../src/infrastructure/pdf/sheetTextItems.js';
@@ -223,6 +223,24 @@ check('punch list items carry the sheet number they are given, or Sheet N', () =
     sheetLabelFor: (documentName, page) => (page === 0 ? 'A-101' : `Sheet ${page + 1}`),
   });
   assert.deepEqual(groups[0].items.map((item) => item.sheetLabel), ['A-101', 'Sheet 2']);
+});
+
+check('the issued schedule prints the sheet number it is given, and Sheet N without one', () => {
+  const entries = PunchListRegistry.collect([
+    { pageIndex: 0, annotations: [pinOnPage(0)], sheetLabel: 'A-101' },
+    { pageIndex: 1, annotations: [pinOnPage(1)] },
+  ]);
+  assert.deepEqual(entries.map((entry) => entry.sheetLabel), ['A-101', 'Sheet 2']);
+});
+
+check('a relabelled schedule entry keeps everything else', () => {
+  const [entry] = PunchListRegistry.collect([{ pageIndex: 0, annotations: [pinOnPage(0)] }]);
+  const relabelled = entry.withSheetLabel('A-101');
+  assert.equal(relabelled.sheetLabel, 'A-101');
+  assert.equal(relabelled.number, entry.number);
+  assert.equal(relabelled.description, entry.description);
+  assert.deepEqual(relabelled.details, entry.details);
+  assert.ok(Object.isFrozen(relabelled));
 });
 
 // --- run --------------------------------------------------------------------

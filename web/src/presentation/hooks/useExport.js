@@ -17,7 +17,7 @@ export function useExport() {
   const flattenedSeals = exportsFlattened.seals();
 
   const exportDocument = useCallback(
-    async ({ sourceFile, documentName = sourceFile?.name, pageCount, sheetIdFor, author, flatten = false }) => {
+    async ({ sourceFile, documentName = sourceFile?.name, pageCount, sheetIdFor, sheetLabelFor, author, flatten = false }) => {
       if (!sourceFile) return;
 
       setStatus({ busy: true, message: 'Reading drawing…', error: null });
@@ -35,6 +35,8 @@ export function useExport() {
             sourceBytes,
             pageCount,
             sheetIdFor,
+            // "A-101" on the schedule rather than "Sheet 1" — see domain/sheets.
+            sheetLabelFor,
             author,
             documentName,
             onProgress: (done, total) =>
