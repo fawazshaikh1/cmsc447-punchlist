@@ -94,6 +94,9 @@ export class ExportService {
    *        because the id scheme is a presentation concern today
    *        (`filename#pageIndex`) and becomes a database id in Sprint 2 —
    *        this service should not have to change when it does.
+   * @param {(pageIndex: number) => string} [request.sheetLabelFor] What the
+   *        schedule calls each sheet — "A-101" where the drawing names its
+   *        sheets. Without it the schedule says "Sheet N", as it always has.
    * @param {string} [request.author] Shown as the annotation author in
    *        Acrobat. Defaults to whoever is signed in.
    * @param {string} request.documentName Which drawing set this is. The key the
@@ -107,6 +110,7 @@ export class ExportService {
     sourceBytes,
     pageCount,
     sheetIdFor,
+    sheetLabelFor,
     author,
     documentName,
     onProgress,
@@ -129,7 +133,7 @@ export class ExportService {
       // where six sheets were marked, this keeps the exporter's work
       // proportional to the markup rather than to the document.
       if (annotations.length > 0) {
-        pages.push({ pageIndex, annotations });
+        pages.push(sheetLabelFor ? { pageIndex, annotations, sheetLabel: sheetLabelFor(pageIndex) } : { pageIndex, annotations });
         annotationIdsBySheet[sheetId] = annotations.map((a) => a.id);
         annotationCount += annotations.length;
       }

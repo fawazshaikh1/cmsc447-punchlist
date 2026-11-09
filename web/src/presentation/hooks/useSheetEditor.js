@@ -70,6 +70,11 @@ export function useSheetEditor({
   const [items, setItems] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
   const [toolId, setToolId] = useState(() => ToolRegistry.default().getId());
+  // The markup this person last drew, once it is saved. Reported, not acted
+  // on: what happens next (back to Select, the new markup selected) is the
+  // tool latch's rule — see presentation/tools/ToolLatch. `seq` makes two
+  // creations two different values even if nothing else about them differs.
+  const [lastCreated, setLastCreated] = useState(null);
   const [style, setStyle] = useState(() => new MarkupStyle());
   const [draft, setDraft] = useState(null);
   const [moving, setMoving] = useState(null);
@@ -88,6 +93,14 @@ export function useSheetEditor({
   // box that snaps back mid-drag.
   const draftRef = useRef(null);
   const movingRef = useRef(null);
+  // The tool a draft was started with, which finishes it whatever is in hand
+  // by then: a markup made a moment earlier can still be saving when the next
+  // drag starts, and the return to Select it triggers must not turn a box
+  // half dragged out into a Select draft.
+  const draftToolRef = useRef(null);
+  // A markup is waiting on its photo or description — the dialog is open, and
+  // there is no draft yet. Counts as drawing, so Escape leaves the tool alone.
+  const [placing, setPlacing] = useState(false);
 
   /**
    * Whether the signed-in person's role lets them use this tool: selecting is
@@ -384,6 +397,7 @@ export function useSheetEditor({
         }
 
         const extras = {};
+        setPlacing(true);
 
         // Photo first, because it is the step most likely to be abandoned —
         // a denied camera permission or a cancelled file picker. Asking for
@@ -412,14 +426,19 @@ export function useSheetEditor({
           setDraftBoth(null);
           void run(async () => {
             const finalized = reader.finalizeDraft(tool, created);
-            if (finalized) await editor.add(finalized);
+            if (!finalized) return;
+            await editor.add(finalized);
+            setLastCreated((last) => ({ id: finalized.id, seq: (last?.seq ?? 0) + 1 }));
           });
           return;
         }
 
+        draftToolRef.current = tool;
         setDraftBoth(created);
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        setPlacing(false);
       }
     },
     [
@@ -452,7 +471,7 @@ export function useSheetEditor({
       const current = draftRef.current;
       if (!current) return;
 
-      const next = reader.updateDraft(tool, context, current, at);
+      const next = reader.updateDraft(draftToolRef.current ?? tool, context, current, at);
       // The tool may return the same instance when it judged the movement too
       // small to record. Skipping the write keeps React from repainting on
       // every discarded sample.
@@ -478,15 +497,20 @@ export function useSheetEditor({
     const current = draftRef.current;
     if (!current) return false;
 
+    const drawing = draftToolRef.current ?? tool;
+    draftToolRef.current = null;
     setDraftBoth(null);
     void run(async () => {
-      const finalized = reader.finalizeDraft(tool, current);
-      if (finalized) await editor.add(finalized);
+      const finalized = reader.finalizeDraft(drawing, current);
+      if (!finalized) return;
+      await editor.add(finalized);
+      setLastCreated((last) => ({ id: finalized.id, seq: (last?.seq ?? 0) + 1 }));
     });
     return false;
   }, [reader, editor, tool, run, setDraftBoth, setMovingBoth]);
 
   const cancel = useCallback(() => {
+    draftToolRef.current = null;
     setDraftBoth(null);
     setMovingBoth(null);
   }, [setDraftBoth, setMovingBoth]);
@@ -588,6 +612,11 @@ export function useSheetEditor({
     toolId: tool.getId(),
     selectTool: setToolId,
     canUseTool,
+    /**
+     * `{ id, seq }` of the markup this person last drew, set once it is saved
+     * — never by undo, redo, a move or an edit. Null until the first one.
+     */
+    created: lastCreated,
     style,
     setStyle,
 
@@ -596,6 +625,11 @@ export function useSheetEditor({
     finish,
     cancel,
     isDragging: moving !== null,
+    /**
+     * A markup is being drawn: dragged out, or waiting on its photo or
+     * description. The tool latch leaves the tool alone until it is done.
+     */
+    isDrawing: draft !== null || placing,
 
     update,
     remove,

@@ -17,15 +17,21 @@ from a tablet, and the drawing is issued at the end.
 - **Create account**: name, company, title, and a passphrase of 15+
   characters. *A passphrase is easier to type on site than symbols.*
 - **Start a project**: "Engineering Building". You are its admin.
-- **Open drawing** → the sample set. Four sheets; "Sheet 1 of 4" switches them.
-  It is saved to the project as it opens: everyone on it can now open it from
+- **Open drawing** → the sample set. Four sheets, and a moment after it opens
+  the sheet picker names them from their title blocks: *A-101 · LEVEL 1 FLOOR
+  PLAN*, A-102, A-201, A-601. **Rename this sheet…** at the foot of the picker
+  is there for a title block that says nothing useful. It is saved to the
+  project as it opens: everyone on it can now open it from
   **Drawings**, on any device, without the file.
 
 ## 2. Raise punch items (2 min)
 
 - **Pin** → tap a spot → "What needs fixing?" → *Fire door closer missing*.
-  The pin is numbered 1.
-- **Box**, **Cloud** and **Arrow**: drag on the sheet. **Photo**: tap, choose a
+  The pin is numbered 1, and the rail is back on **Select** with the pin open
+  — no trip to the rail to edit what you just placed.
+- **Box**, **Cloud** and **Arrow**: drag on the sheet. Double-click **Box** to
+  keep it on for several boxes, then Esc. The keys work too: P, B, C, A, and V
+  for Select. **Photo**: tap, choose a
   file, *Place photo*.
 - Select the pin. In **Assignment**: trade *Doors*, company *Metro Drywall*,
   **Assigned to** — the project's people are offered — and a due date last
@@ -39,7 +45,8 @@ proven.
 
 ## 3. The punch list (1 min)
 
-- Panel → **Punch list**. Every item in the project, numbered like the pins.
+- Panel → **Punch list**. Every item in the project, numbered like the pins
+  and named by its sheet — *A-101 · Open*.
 - Filter **Overdue**, then a company, then search "door". Tap an item: it goes
   to its sheet and selects it.
 
@@ -64,8 +71,8 @@ comes back `403` with the reason.
 - **Working copy**: markups stay selectable and repliable in Acrobat. Reopen
   that file here: the markups come back live, as the same items — not copies.
 - **Issue PDF** → the confirmation counts what will be locked → issue. Open
-  the PDF: markups painted in, a punch list page appended with trade, company
-  and due dates, issued by the PM by name.
+  the PDF: markups painted in, a punch list page appended with each item's sheet
+  number, trade, company and due date, issued by the PM by name.
 - Back in the app, the issued items are read-only, with the reason, and undo
   cannot reach behind the issue.
 
@@ -77,4 +84,4 @@ comes back `403` with the reason.
 | How are passwords stored? | PBKDF2-SHA256, 600,000 iterations, a random salt each. Sessions are HttpOnly cookies; the database holds only their digest. |
 | What stops a collaborator editing? | The server: every write is checked against the role on that project (`backend/access.go`). |
 | How do you add a markup type? | A new class, a marker component and an export writer, each registering itself — no existing file changes. See ARCHITECTURE.md. |
-| How is it tested? | 19 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |
+| How is it tested? | 21 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |

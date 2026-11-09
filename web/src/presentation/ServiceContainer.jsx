@@ -38,6 +38,8 @@ import { SessionIdentityProvider } from '../infrastructure/identity/SessionIdent
 import { HttpAccountRepository } from '../infrastructure/auth/HttpAccountRepository';
 import { HttpProjectRepository } from '../infrastructure/auth/HttpProjectRepository';
 import { HttpDrawingLibrary } from '../infrastructure/library/HttpDrawingLibrary';
+import { HttpSheetNameRepository } from '../infrastructure/sheets/HttpSheetNameRepository';
+import { PdfJsSheetNameDetector } from '../infrastructure/pdf/PdfJsSheetNameDetector';
 
 /**
  * ===========================================================================
@@ -202,6 +204,11 @@ export function ServiceContainer({
       projects: api ? new HttpProjectRepository(api) : null,
       // The project's drawings, opened from any device (FR-10). Server mode only.
       library: api ? new HttpDrawingLibrary(api) : null,
+      // What each sheet is called — "A-101 · LEVEL 1 FLOOR PLAN" — kept with
+      // the project in server mode (spec 5.2), and read from title blocks in
+      // either mode.
+      sheetNames: api ? new HttpSheetNameRepository(api) : null,
+      sheetNameDetector: new PdfJsSheetNameDetector(),
       // Both read directly by the editor hook. Exposed because they are domain
       // ports — the presentation layer depending on them is the dependency rule
       // working, not a leak.

@@ -1,6 +1,13 @@
+import { useRef, useState } from 'react';
+
 import { ToolRegistry } from '../../domain/tools';
 import { MarkupStyle } from '../../domain/annotations';
+import { HoldGesture } from '../tools/HoldGesture';
 import { Icon } from './Icon';
+import '../tools/tools.css';
+
+/** How long a finger rests on a tool before it is kept on. */
+const HOLD_MS = 500;
 
 /** Colours a punch walk actually uses. Each one MEANS something. */
 const SWATCHES = [
@@ -49,6 +56,21 @@ const TOOL_ICONS = {
  * whose contents and order are declared in `domain/tools/index.js`. Photo was
  * the eighth tool and appeared here without this component being edited — the
  * same property the registries give the model, the renderer and the exporter.
+ *
+ * ---------------------------------------------------------------------------
+ * KEEPING A TOOL ON
+ * ---------------------------------------------------------------------------
+ * A tool is used once and the app returns to Select (presentation/tools/
+ * ToolLatch). Double-clicking a tool — or resting a finger on it, on a tablet,
+ * where there is no double-click — keeps it on for placing several; a small
+ * lock shows which. The rail only reports the gesture; the latch decides.
+ *
+ * @param {object} props
+ * @param {string|null} [props.lockedToolId] The tool kept on, if any.
+ * @param {(toolId: string) => void} [props.onLockTool] Double-click or long
+ *        press on a tool.
+ * @param {(toolId: string) => string|null} [props.shortcutFor] The key that
+ *        picks a tool, shown in its tooltip.
  */
 export function ToolPalette({
   activeToolId,
@@ -67,7 +89,31 @@ export function ToolPalette({
   panelOpen,
   onTogglePanel,
   isToolAvailable = () => true,
+  lockedToolId = null,
+  onLockTool,
+  shortcutFor = () => null,
 }) {
+  // One finger at a time on the rail, so one timer is enough. A long press
+  // that locked a tool may end in a click, which must not then unlock it —
+  // see HoldGesture for why every press, Select's too, starts clean.
+  const holdTimer = useRef(null);
+  const [finger] = useState(() => new HoldGesture());
+
+  const startHold = (event, id, lockable) => {
+    finger.press();
+    if (!lockable || event.pointerType !== 'touch') return;
+    clearTimeout(holdTimer.current);
+    holdTimer.current = setTimeout(() => {
+      holdTimer.current = null;
+      finger.held();
+      onLockTool(id);
+    }, HOLD_MS);
+  };
+  const endHold = () => {
+    clearTimeout(holdTimer.current);
+    holdTimer.current = null;
+  };
+
   return (
     <nav className="tool-rail" aria-label="Markup tools">
       {/* First in the rail rather than in the top bar: at tablet width the top
@@ -123,6 +169,12 @@ export function ToolPalette({
         {ToolRegistry.all().filter(isToolAvailable).map((tool) => {
           const id = tool.getId();
           const isActive = id === activeToolId;
+          const isLocked = id === lockedToolId;
+          const lockable = !tool.isSelection() && Boolean(onLockTool);
+          const key = shortcutFor(id);
+          const title =
+            `${tool.getLabel()}${key ? ` (${key})` : ''}` +
+            (isLocked ? ' — kept on; click to use it once' : lockable ? ' — double-click to keep it on' : '');
 
           return (
             <button
@@ -131,11 +183,24 @@ export function ToolPalette({
               role="radio"
               aria-checked={isActive}
               className={isActive ? 'tool active' : 'tool'}
-              onClick={() => onSelectTool(id)}
-              title={tool.getLabel()}
+              onClick={() => {
+                if (finger.click()) onSelectTool(id);
+              }}
+              onDoubleClick={lockable ? () => onLockTool(id) : undefined}
+              onPointerDown={(event) => startHold(event, id, lockable)}
+              onPointerUp={endHold}
+              onPointerLeave={endHold}
+              onPointerCancel={endHold}
+              title={title}
+              aria-label={title}
             >
               <Icon name={TOOL_ICONS[id] ?? 'draw'} size={22} />
               <span className="tool-label">{tool.getLabel()}</span>
+              {isLocked && (
+                <span className="tool-lock" aria-hidden="true">
+                  <Icon name="lock" size={12} />
+                </span>
+              )}
             </button>
           );
         })}

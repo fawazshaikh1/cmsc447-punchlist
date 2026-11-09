@@ -35,18 +35,28 @@ const DUE = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short' 
  * @param {string|null} props.documentName The drawing on screen.
  * @param {number} props.pageCount
  * @param {(pageIndex: number) => string|null} props.sheetIdFor
+ * @param {(documentName: string, pageIndex: number) => string} [props.sheetNumberFor]
+ *        What a row calls its sheet — "A-101", or "Sheet N" where no name is
+ *        known.
  * @param {unknown} props.changeKey Changes when the open sheet's markups do.
  * @param {(item: import('../../domain/punchlist/TaskList').TaskListItem) => void} props.onGo
  */
-export function PunchListPanel({ active, documentName, pageCount, sheetIdFor, changeKey, onGo }) {
+export function PunchListPanel({ active, documentName, pageCount, sheetIdFor, sheetNumberFor, changeKey, onGo }) {
   const account = useContext(SessionContext)?.account ?? null;
   const { items, error } = usePunchListItems({ active, documentName, pageCount, sheetIdFor, changeKey });
   const [filters, setFilters] = useState({ status: TaskFilter.OUTSTANDING, company: '', trade: '', mine: false, query: '' });
   const ids = useId();
 
   const groups = useMemo(
-    () => (items ? buildTaskList(items, { today: currentFlagContext().today, openDocument: documentName }) : []),
-    [items, documentName],
+    () =>
+      items
+        ? buildTaskList(items, {
+            today: currentFlagContext().today,
+            openDocument: documentName,
+            sheetLabelFor: sheetNumberFor,
+          })
+        : [],
+    [items, documentName, sheetNumberFor],
   );
   const options = useMemo(() => taskListOptions(groups), [groups]);
   const shown = useMemo(
@@ -151,7 +161,7 @@ export function PunchListPanel({ active, documentName, pageCount, sheetIdFor, ch
                   className="punch-item"
                   disabled={!group.isOpen}
                   onClick={() => onGo(item)}
-                  title={group.isOpen ? `Go to item ${item.number} on sheet ${item.pageIndex + 1}` : `Open ${group.documentName} to see it on the drawing`}
+                  title={group.isOpen ? `Go to item ${item.number} on ${item.sheetLabel}` : `Open ${group.documentName} to see it on the drawing`}
                 >
                   <span className={`punch-number status-${item.statusKey}`}>{item.number}</span>
                   <span className="punch-body">
@@ -159,7 +169,7 @@ export function PunchListPanel({ active, documentName, pageCount, sheetIdFor, ch
                       {item.description || 'No description yet'}
                     </span>
                     <span className="punch-meta">
-                      {[`Sheet ${item.pageIndex + 1}`, item.status, item.company, item.trade, item.assignee && `→ ${item.assignee}`]
+                      {[item.sheetLabel, item.status, item.company, item.trade, item.assignee && `→ ${item.assignee}`]
                         .filter(Boolean)
                         .join(' · ')}
                     </span>

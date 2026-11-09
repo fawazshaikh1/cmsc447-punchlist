@@ -40,10 +40,13 @@ export class PunchListEntry {
    *        company, due date and whatever else is recorded, already labelled
    *        and formatted — see ItemDetails.labelled(). The writer prints them
    *        as they come, so a new field reaches the schedule unedited.
+   * @param {string} [fields.sheetName] The sheet's number, "A-101", where the
+   *        drawing names its sheets (see domain/sheets). Empty prints "Sheet N".
    */
-  constructor({ number, pageIndex, description, status, statusKey, createdAt, details = [] }) {
+  constructor({ number, pageIndex, description, status, statusKey, createdAt, details = [], sheetName = '' }) {
     this.number = number;
     this.pageIndex = pageIndex;
+    this.sheetName = typeof sheetName === 'string' ? sheetName.trim() : '';
     // An empty description is the normal case for an item raised in a hurry and
     // not yet written up. It is recorded honestly rather than hidden, because a
     // blank row on the schedule is exactly the prompt someone needs.
@@ -68,9 +71,28 @@ export class PunchListEntry {
     return this.details.map(({ label, value }) => `${label}: ${value}`).join('   ·   ');
   }
 
-  /** The sheet as a person refers to it. */
+  /** The sheet as a person refers to it — "A-101", or "Sheet 3" unnamed. */
   get sheetLabel() {
-    return `Sheet ${this.pageIndex + 1}`;
+    return this.sheetName || `Sheet ${this.pageIndex + 1}`;
+  }
+
+  /**
+   * The same line, naming its sheet. Builders do not know what a sheet is
+   * called — that is the drawing's business — so the name is added after.
+   * @param {string} label
+   * @returns {PunchListEntry}
+   */
+  withSheetLabel(label) {
+    return new PunchListEntry({
+      number: this.number,
+      pageIndex: this.pageIndex,
+      description: this.description,
+      status: this.status,
+      statusKey: this.statusKey,
+      createdAt: this.createdAt,
+      details: this.details,
+      sheetName: label,
+    });
   }
 
   /** ISO date, no time. A punch list is a day-resolution document. */

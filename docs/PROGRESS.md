@@ -4,9 +4,9 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-11-01 — four bugs found taking the SRS screenshots
+**Last updated:** 2026-11-05 — Fieldwire release, phase 1: Select by default, sheets called by their numbers
 **Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go + pgx · PostgreSQL 17 · AWS (S3, RDS) planned
-**Codebase:** 221 source files, ~27,450 lines (app and server)
+**Codebase:** 260 source files, ~30,650 lines (app and server)
 
 ---
 
@@ -58,6 +58,8 @@ easy to write.
 | **Go API persistence** | **Done** | Markups, change history and exports in Postgres (SCRUM-39, 40, 41); the sheet keeps up with teammates |
 | Offline sync | Not started | Sprint 3 |
 | **Drawings stored on the server** | **Done** | Each project keeps its PDFs; an admin's drawing is saved when opened, anyone on the project opens it from **Drawings** on any device. `go test` (4 tests), `verify -- library`, browser: second user opened it with every markup |
+| **Select by default, one-shot tools** | **Done** | A tool places one markup and hands back to Select with it open; double-click (hold on a tablet) keeps a tool on; V P B C A D T I pick tools, Esc returns to Select. `verify -- tool-latch` (18 checks); browser at three widths, three roles |
+| **Sheet numbers from the title block** | **Done** | "A-101 · LEVEL 1 FLOOR PLAN" read from each sheet once, kept with the project, renamed by an admin; in the sheet picker, the punch list and the issued schedule. `go test` (6 tests), `verify -- sheet-names` (18 checks); browser |
 | Comments and replies | Not started | Sprint 3 — the change log already has a `comment` intent |
 
 ---
@@ -133,6 +135,48 @@ embedded font (~300KB per export) — a deliberate Sprint 3 decision.
 ---
 
 ## Session log
+
+### 2026-11-05 — Fieldwire release, phase 1: Select by default, sheets called by their numbers
+
+The stakeholders asked for the product to work like Fieldwire: a Tasks tab,
+tasks sorted by sheet, bookmarks, a way back from mistakes, and no trip to the
+tool rail for Select between every markup. Planned as four phases
+(`docs/design/2026-11-04-fieldwire-tasks-design.md`); this is the
+first.
+
+- **Select is the default tool.** A tool places one markup and hands back to
+  Select with the new markup open, so the next tap edits it instead of placing
+  another. Double-click a tool (hold it on a tablet) to keep it on — a lock
+  shows on the button — and Escape returns to Select. Keys pick tools: V
+  Select, P Pin, B Box, C Cloud, A Arrow, D Draw, T Text, I Photo; ignored
+  while typing, with Ctrl or Cmd, and for tools the role does not have.
+- **Sheets are called by their numbers.** Each sheet's title block is read
+  once, by the first admin or power collaborator to open the drawing, and the
+  project keeps "A-101 · LEVEL 1 FLOOR PLAN" for everyone
+  (`backend/sheet_names.go`, a `sheet_names` table). An admin renames a sheet
+  from the sheet picker, and a later reading never overwrites a rename. The
+  punch list and the issued PDF's schedule say "A-101" instead of "Sheet 1".
+- **Found on the way.** pdf.js 6 has no `destroy()` on a document, only on
+  its loading task: the first reader read every page, then threw closing
+  the document, and no drawing was ever named. A check now drives the reader through a loading
+  task shaped like pdf.js's. A Rename button beside the picker covered the
+  zoom buttons at 1024px; renaming moved into the picker. The last browser
+  pass found the picker cut to "A-10…" from 1001 to about 1500px, and on a
+  phone pushing Drawings onto a fourth row: it now never goes narrower than
+  "Sheet 1 of 4" did, so the bar lays out as before, and on a phone it shares
+  its row.
+- **Final review, four fixes.** Escape or a tool key in the middle of a drag
+  froze the half-drawn box and letting go saved it — the draft is now
+  dropped and the tool kept. Names read while a new drawing was still
+  uploading were refused and lost — now shown at once and saved once it
+  arrives. A long press that ended without a click (Android) ate the next
+  tap on the rail. And at 900px and below a new markup was selected behind
+  the hidden panel — the panel now opens with it.
+
+Verified: 21 verify suites (`tool-latch` and `sheet-names` new), 6 new Go
+tests (39 in all, `-race`), lint, build, and the browser at 1470, 768 and
+375px as admin, power collaborator and collaborator — the sample set reads
+A-101, A-102, A-201 and A-601.
 
 ### 2026-11-01 — Four bugs found taking the SRS screenshots on the live site
 
@@ -285,7 +329,9 @@ writing them again would duplicate every existing comment on every export.
 
 ## Next up
 
-1. **Merge to main** — the accounts work (#18), then the Sprint 2 wrap-up.
+1. **Fieldwire release, phases 2–4** — the Tasks tab with on-sheet and
+   off-sheet tasks, comments and bookmarks, then reversals (spec
+   `docs/design/2026-11-04-fieldwire-tasks-design.md`).
 2. **Run it on a real iPad** (SCRUM-38) over the LAN: draw with a finger,
    pinch, take a photo with the camera.
 3. **Deploy to AWS with HTTPS** (SCRUM-49): photos move from Postgres to S3 in

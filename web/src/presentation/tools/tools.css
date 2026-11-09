@@ -1,0 +1,21 @@
+/* =========================================================================
+   A TOOL KEPT ON — see presentation/tools/ToolLatch
+   ========================================================================= */
+
+/* The lock sits in the tool's corner, so the tool still reads as itself. */
+.tool {
+  position: relative;
+  /* A long press keeps a tool on; without these, iOS answers the same press
+     with its text-selection loupe and callout menu. */
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+
+.tool-lock {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  display: inline-flex;
+  color: currentColor;
+  pointer-events: none;
+}

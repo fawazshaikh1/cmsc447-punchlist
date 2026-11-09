@@ -105,8 +105,9 @@ registry rather than by a conditional in that consumer:
 | `PunchListRegistry` | how it reads on the issued schedule | domain | skips — most markups are not action items |
 | `ItemFieldRegistry` | what else is recorded on a punch item (trade, company…) | domain | keeps the value — a field from a newer build is never deleted |
 | `FieldEditorRegistry` | which input edits each kind of field | presentation | shows the value read-only |
+| `ToolShortcutRegistry` | which key picks a tool | presentation | no key — the tool is still on the rail |
 
-Eight sounds like a lot until you notice the alternative: a `switch` in each of
+Nine sounds like a lot until you notice the alternative: a `switch` in each of
 those consumers, so every new type risks breaking every existing one and
 guarantees merge conflicts on a team working in parallel.
 
@@ -165,7 +166,9 @@ Four new files and four barrel lines. **Zero edits to existing code.**
 4. `infrastructure/export/writers/yourWriter.js` — map it to a native PDF
    annotation subtype and register with `PdfWriterRegistry`.
 
-Then one export line in each of the four `index.js` barrels.
+Then one export line in each of the four `index.js` barrels. A key for the new
+tool, if it should have one, is one more line —
+`ToolShortcutRegistry.register('yourTool', 'Y')` in `presentation/tools/index.js`.
 
 No switch statements, no database migration (kind-specific fields go in the
 `payload` JSONB column), no changes to the repository, the services, the
@@ -709,6 +712,80 @@ the way a file is uploaded once and then opened in Acrobat's file view.
 
 `go test` (`documents_test.go`) and `npm run verify -- library`.
 
+## Select by default, one tool at a time
+
+A tool used to stay on after it placed a markup, so the next tap placed
+another, and editing what had just been made meant a trip to the rail for
+Select. Now a tool places one markup and hands back to Select with that markup
+open, as Fieldwire and Bluebeam do.
+
+| Piece | What it does |
+|---|---|
+| `presentation/tools/ToolLatch` | pure: which tool is on after a press, a hold, a create or Escape, and whether the new markup is selected |
+| `presentation/tools/useToolLatch` | applies it once per new markup — `useSheetEditor` reports each add as `created` (`{ id, seq }`) |
+| `presentation/tools/ToolShortcutRegistry` | which key picks which tool, filled in `presentation/tools/index.js` |
+| `presentation/tools/shortcutTarget`, `useToolShortcuts` | a key picks its tool unless the person is typing, holds Ctrl, Cmd or Alt, or their role does not have that tool |
+| `presentation/tools/HoldGesture` | which click only ends a long press, so it is not taken for a second press — and only that one |
+
+- **Keeping a tool on.** Double-click a tool, or hold it for half a second on a
+  tablet, and it stays on; a lock shows on the button. Pressing it again
+  releases the lock, and Escape returns to Select.
+- A gesture that makes nothing — a pin whose description was dismissed —
+  leaves the tool on, so the person can try again.
+- **While a markup is being drawn** — dragged out, or waiting on its photo or
+  description — nothing changes the tool. Escape drops the draft and leaves
+  the tool as it was, a key waits, and a drag finishes with the tool it
+  started with even if the markup before it, still saving, sends the app back
+  to Select.
+- "Open" includes the panel: at 900px and below it starts hidden, and placing
+  a markup brings it in with the new markup's details.
+- The latch is presentation state, not a domain rule: which tool is in the
+  hand means nothing to storage, export or the server. It is pure functions
+  all the same, so it is checked in Node.
+
+`npm run verify -- tool-latch`.
+
+## Sheet numbers and titles
+
+A drawing set names its own sheets in the title block — "A-101 · LEVEL 1 FLOOR
+PLAN" — and the product called them "Sheet 1". It now reads the names once,
+keeps them with the project, and uses them wherever a sheet is named.
+
+| Piece | What it does |
+|---|---|
+| `domain/sheets` | `SheetName` (number and title, detected or edited, tidied and capped at 40 and 120 characters), `SheetNames` (one drawing's names, "Sheet N" for a page without one) and `findSheetName` — a page's text in, its number and title out |
+| `domain/ports/SheetNameDetector` | reads a drawing's names; `PdfJsSheetNameDetector` opens its own copy with pdf.js, so the drawing on screen is never held up by it |
+| `domain/ports/SheetNameRepository` | the project's names; `HttpSheetNameRepository`, server mode only |
+| `backend/sheet_names.go` | `GET /api/projects/{id}/sheet-names` and `PUT /api/projects/{id}/sheet-names/{drawing}`; the `sheet_names` table (`sheet_names_schema.sql`), one row per drawing and page |
+| `presentation/sheets` | `useSheetNames` — load, read, rename — and `RenameSheetDialog` |
+
+- **How a name is found.** A value labelled SHEET NUMBER, SHEET NO., DWG NO. or
+  SHEET TITLE wins. Without labels, the number is the largest sheet-number-shaped
+  text (A-101, S-2.01, M1.1) in the bottom-right third of the sheet, and the
+  title the largest capitalised line beside it. Grid bubbles, room numbers,
+  dimensions, dates and "SEE A-501" are not taken. A scanned set has no text,
+  so its pages stay "Sheet N".
+- **Who reads, who renames.** The first admin or power collaborator to open a
+  drawing reads it in the background and saves names for the pages that have
+  none (`detected`). A collaborator never reads; they see "Sheet N" until
+  someone has. Only an admin renames, from the sheet picker (`edited`): a
+  rename replaces the name, and no later reading overwrites it. The server
+  refuses both from anyone else.
+- **A drawing still uploading.** An admin's new drawing is read while its PDF
+  is on its way to the library, and the server refuses names for a drawing it
+  does not have yet. They are shown at once and saved when the library
+  reports the drawing added (`presentation/sheets/UnsavedSheetNames`).
+- **Where the names show.** The sheet picker, the punch list ("A-101 · Open ·
+  …") and the issued PDF's schedule. `ExportService` takes an optional
+  `sheetLabelFor` and `PunchListRegistry` relabels each schedule entry with
+  it, so neither the PDF writers nor the schedule page know where a name came
+  from.
+- Names are filed under the drawing's name in the project, like its sheets,
+  and a drawing removed from the library takes its names with it. In browser
+  mode they are read and kept for the session.
+
+`go test` (`sheet_names_test.go`) and `npm run verify -- sheet-names`.
+
 ## Staying current
 
 With a team on one server, the open sheet is re-read — markups, who last
@@ -753,8 +830,11 @@ web/src/
                                ChangeLogRepository, MediaStore,
                                AccountRepository, ProjectRepository,
                                WorkingCopyReader, UploadLedger,
-                               DrawingLibrary — all CONTRACTS
+                               DrawingLibrary, SheetNameRepository,
+                               SheetNameDetector — all CONTRACTS
     documents/                 sheetNames — how a sheet is named, and read back
+    sheets/                    SheetName, SheetNames, findSheetName — what a
+                               sheet is called, read from its title block
     punchlist/                 the schedule (PunchListRegistry, ordinals) and
                                the on-screen list (TaskList), sharing numbers
     upload/                    browser work reaching the server: markups,
@@ -769,7 +849,8 @@ web/src/
                                ExportService
 
   infrastructure/              TIER 3 — implements the contracts
-    pdf/                       the ONLY two files importing pdfjs-dist
+    pdf/                       drawing a page and reading title blocks — the
+                               ONLY two files importing pdfjs-dist are here
     export/                    pdf-lib exporter + 6 annotation writers
     persistence/               InMemory | LocalStorage | Http, plus the
                                export-history and change-log repositories
@@ -779,12 +860,16 @@ web/src/
     media/                     IndexedDbMediaStore, HttpMediaStore,
                                CanvasImageProcessor
     library/                   HttpDrawingLibrary — a project's drawings
+    sheets/                    HttpSheetNameRepository — a project's sheet names
 
   presentation/                TIER 1 — React
     ServiceContainer.jsx       COMPOSITION ROOT — the only wiring file
     session/                   sign-in, project choice, people, account menu
     hooks/                     document / view state / annotations / drawing / export
     gestures/                  pinch-zoom and two-finger pan (SCRUM-48)
+    tools/                     which tool is on after a markup (ToolLatch) and
+                               the keys that pick tools (ToolShortcutRegistry)
+    sheets/                    sheet names: loading, reading, renaming
     punchlist/                 the punch list view and its loader
     library/                   the project's drawings: the list, the top-bar
                                dialog, opening from disk or from the server
@@ -801,7 +886,7 @@ web/src/
       useAutoFocus.js          focus that survives the gesture that opened it
 
 web/scripts/
-  verify-all.mjs               npm run verify — runs every verify-*.mjs (19
+  verify-all.mjs               npm run verify — runs every verify-*.mjs (21
                                suites); `npm run verify -- photos` runs one
   verify-*.mjs                 one suite per behaviour, no framework
 
@@ -810,6 +895,7 @@ backend/
   auth.go, projects.go         accounts and sessions; projects, members, roles
   access.go                    the role check wrapped around every route
   media.go                     photos
+  sheet_names.go               what each sheet is called
   *_schema.sql                 applied at startup (schema.sql is the base)
   *_test.go                    integration tests against punchlist_test
 ```
