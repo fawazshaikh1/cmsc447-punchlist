@@ -97,6 +97,12 @@ func routes() http.Handler {
 	mux.HandleFunc("GET /api/projects/{projectID}/changes/latest", handleProjectLatestChanges)
 	mux.HandleFunc("GET /api/annotations/{annotationID}/changes", handleAnnotationHistory)
 
+	// Comments and bookmarks (comments.go, bookmarks.go).
+	mux.HandleFunc("GET /api/projects/{projectID}/comments/counts", handleCommentCounts)
+	mux.HandleFunc("GET /api/projects/{projectID}/bookmarks", handleListBookmarks)
+	mux.HandleFunc("PUT /api/projects/{projectID}/bookmarks/{sheetID}", handleAddBookmark)
+	mux.HandleFunc("DELETE /api/projects/{projectID}/bookmarks/{sheetID}", handleRemoveBookmark)
+
 	return withCORS(requireAppRequest(mux))
 }
 
