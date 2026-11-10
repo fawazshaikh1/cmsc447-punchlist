@@ -1,4 +1,4 @@
-import { PIN_KIND } from '../annotations';
+import { PIN_KIND, TASK_KIND } from '../annotations';
 import { PunchListEntry } from './PunchListEntry';
 import { PunchListRegistry } from './PunchListRegistry';
 import { statusLabel } from './statusLabels';
@@ -24,17 +24,22 @@ export { buildTaskList, filterTaskList, taskListOptions, TaskFilter } from './Ta
  * difference between "a pin gained a method" and "the export gained a feature":
  * this whole folder can be deleted and `Pin` still compiles.
  */
-PunchListRegistry.register(PIN_KIND, (pin, { number, pageIndex }) =>
+/** One line of the punch list for a pin — or for a task off the drawings. */
+const itemEntry = (item, { number, pageIndex }) =>
   new PunchListEntry({
     number,
     pageIndex,
-    description: pin.label,
-    status: statusLabel(pin.status),
-    statusKey: pin.status,
-    createdAt: pin.createdAt,
+    description: item.label,
+    status: statusLabel(item.status),
+    statusKey: item.status,
+    createdAt: item.createdAt,
     // Whatever item fields are registered and set — trade, company, assignee,
     // due date. Read through the capability, so a pin built before details
     // existed simply has none.
-    details: typeof pin.details?.labelled === 'function' ? pin.details.labelled() : [],
-  }),
-);
+    details: typeof item.details?.labelled === 'function' ? item.details.labelled() : [],
+  });
+
+PunchListRegistry.register(PIN_KIND, itemEntry);
+// A task off the drawings is on the Tasks tab's list (spec 6.4). It is never
+// on an issued schedule: its `~tasks` sheet belongs to no drawing.
+PunchListRegistry.register(TASK_KIND, itemEntry);

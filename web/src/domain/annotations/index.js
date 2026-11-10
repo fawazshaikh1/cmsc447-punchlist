@@ -34,3 +34,4 @@ export { ArrowMarkup, ARROW_KIND } from './ArrowMarkup';
 export { InkMarkup, INK_KIND } from './InkMarkup';
 export { TextMarkup, TEXT_KIND } from './TextMarkup';
 export { PhotoMarkup, PHOTO_KIND } from './PhotoMarkup';
+export { OffSheetTask, TASK_KIND } from './OffSheetTask';

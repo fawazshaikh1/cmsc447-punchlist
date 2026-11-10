@@ -354,10 +354,12 @@ check('an ISSUED pin\'s details cannot be changed', async () => {
 // PART 6 — the next field is a new file
 // =========================================================================
 
-check('the four fields are registered, in display order', () => {
+// Priority joined in the Tasks tab release (spec 6.3), after the four
+// assignment fields.
+check('the five fields are registered, in display order', () => {
   assert.deepEqual(
     ItemFieldRegistry.all().map((field) => field.getKey()),
-    [TRADE, COMPANY, ASSIGNEE, DUE],
+    [TRADE, COMPANY, ASSIGNEE, DUE, 'priority'],
   );
 });
 

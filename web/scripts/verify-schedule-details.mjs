@@ -191,7 +191,9 @@ check('rows fit on a large sheet too, where type is scaled up', async () => {
 check('details come out in field order, formatted, unknown keys left out', () => {
   const details = ItemDetails.fromJSON({
     [DueDateField.KEY]: '2026-10-10',
-    priority: 'high',
+    // Not a registered field — priority is one now (spec 6.3), so this
+    // stands for any key a newer build might write.
+    severity: 'high',
     [TradeField.KEY]: 'Glazing',
   });
 
