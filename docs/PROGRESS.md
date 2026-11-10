@@ -4,7 +4,7 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-11-05 — Fieldwire release, phase 1: Select by default, sheets called by their numbers
+**Last updated:** 2026-11-10 — Fieldwire release, phase 2: the Tasks tab
 **Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go + pgx · PostgreSQL 17 · AWS (S3, RDS) planned
 **Codebase:** 260 source files, ~30,650 lines (app and server)
 
@@ -60,6 +60,7 @@ easy to write.
 | **Drawings stored on the server** | **Done** | Each project keeps its PDFs; an admin's drawing is saved when opened, anyone on the project opens it from **Drawings** on any device. `go test` (4 tests), `verify -- library`, browser: second user opened it with every markup |
 | **Select by default, one-shot tools** | **Done** | A tool places one markup and hands back to Select with it open; double-click (hold on a tablet) keeps a tool on; V P B C A D T I pick tools, Esc returns to Select. `verify -- tool-latch` (18 checks); browser at three widths, three roles |
 | **Sheet numbers from the title block** | **Done** | "A-101 · LEVEL 1 FLOOR PLAN" read from each sheet once, kept with the project, renamed by an admin; in the sheet picker, the punch list and the issued schedule. `go test` (6 tests), `verify -- sheet-names` (18 checks); browser |
+| **Tasks tab** | **Done** | Every task in the project in one list: sorted and grouped by sheet (or status, priority, due date, last update), filtered, created on a sheet or off one (G-1, G-2), placed on a sheet later, edited in bulk as one undo step, exported to CSV; a Priority field. `verify -- tasks-tab` (19 checks), 3 Go tests; browser as all three roles at desktop, iPad and phone |
 | Comments and replies | Not started | Sprint 3 — the change log already has a `comment` intent |
 
 ---
@@ -135,6 +136,33 @@ embedded font (~300KB per export) — a deliberate Sprint 3 decision.
 ---
 
 ## Session log
+
+### 2026-11-10 — Fieldwire release, phase 2: the Tasks tab
+
+A **Sheets / Tasks** switch in the top bar. The Tasks tab lists every task in
+the project, like Fieldwire's: sorted by sheet unless asked otherwise, grouped
+by sheet (or status, priority, company), filtered, and opened in a panel with
+every field, the full history and **Open on sheet** — which opens the drawing
+if another is on screen, goes to the page and selects the pin.
+
+- **New task** offers two places. *On a sheet* opens the chosen sheet with the
+  Pin tool armed and the description already typed; one tap places it. *Off a
+  sheet* saves it at once, numbered G-1, G-2…, for work that is at no one spot;
+  **Place on a sheet** later makes it a pin that keeps its id, fields, history
+  and number of comments.
+- **Priority** (High, Medium, Low) is an item field like trade, so it is also
+  in the sheet's side panel, the CSV and the issued schedule. Items with none
+  read as Medium.
+- **Bulk edit**: tick tasks, then set status, priority, company, assignee or
+  due date, or delete — one undo step. Issued tasks are skipped and named.
+- **Export CSV** writes the filtered, sorted list for Excel.
+
+Verified: `verify -- tasks-tab` (19 checks, a new suite), 3 Go tests
+(`tasks_test.go`), 22 suites in all, lint, build, and the browser — as admin
+(priority, off-sheet task placed on A-102, a task created on A-201 with its
+description waiting, a bulk change with one issued task skipped and undone in
+one step, the CSV's bytes), and as collaborator at phone and iPad width (no
+New task, no ticks, a read-only panel).
 
 ### 2026-11-05 — Fieldwire release, phase 1: Select by default, sheets called by their numbers
 

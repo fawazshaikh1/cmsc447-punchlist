@@ -1,0 +1,466 @@
+/* =========================================================================
+   THE TASKS TAB — see presentation/tasks/TasksView
+   ========================================================================= */
+
+/* Sheets / Tasks, in the top bar after the brand. */
+.view-switch {
+  display: inline-flex;
+  flex: none;
+  padding: 3px;
+  gap: 2px;
+  border-radius: var(--radius);
+  background: var(--ink-700);
+}
+
+.view-switch-option {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-200);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.view-switch-option.active {
+  background: var(--accent);
+  color: var(--white);
+}
+
+/* The sheet's own controls mean nothing over a list of tasks. */
+.app.tasks-mode .sheet-nav,
+.app.tasks-mode .topbar-group,
+.app.tasks-mode .topbar-exports {
+  display: none;
+}
+
+.tasks-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink-900);
+}
+
+.tasks-view.with-drawer {
+  grid-template-columns: minmax(0, 1fr) 380px;
+}
+
+.tasks-main {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 18px 40px;
+}
+
+.tasks-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tasks-toolbar select,
+.tasks-toolbar input[type='search'],
+.bulk-bar select,
+.bulk-bar input {
+  min-height: var(--tap);
+  padding: 0 10px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: var(--ink-800);
+  color: var(--white);
+  font: inherit;
+  font-size: 14px;
+}
+
+.tasks-search {
+  flex: 1 1 200px;
+  min-width: 160px;
+}
+
+.tasks-mine,
+.tasks-order {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-200);
+  font-size: 14px;
+}
+
+.tasks-toolbar-gap {
+  flex: 1 1 0;
+}
+
+.tasks-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 2px 8px;
+}
+
+.tasks-notice {
+  margin: 0 0 10px;
+}
+
+.tasks-empty {
+  padding: 24px 4px;
+}
+
+/* --- the bulk bar ------------------------------------------------------- */
+
+.bulk-bar {
+  position: sticky;
+  top: -14px;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--ink-800);
+}
+
+.bulk-count {
+  margin-right: 4px;
+  color: var(--white);
+}
+
+.bulk-field {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.bulk-field input {
+  width: 150px;
+}
+
+.danger-text {
+  color: var(--status-open);
+}
+
+/* --- the list -------------------------------------------------------------- */
+
+.task-table {
+  border: 1px solid var(--ink-650);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+/* A grid row; the clickable part spans every column after the tick box. */
+.task-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  align-items: stretch;
+  border-top: 1px solid var(--ink-650);
+  background: var(--ink-800);
+}
+
+.task-row > .task-open,
+.task-head {
+  display: grid;
+  grid-template-columns: 56px 120px 76px minmax(160px, 2fr) minmax(90px, 1fr) minmax(90px, 1fr) minmax(90px, 1fr) 70px 150px;
+  align-items: center;
+  gap: 10px;
+}
+
+.task-head {
+  grid-template-columns: 40px 56px 120px 76px minmax(160px, 2fr) minmax(90px, 1fr) minmax(90px, 1fr) minmax(90px, 1fr) 70px 150px;
+  padding: 8px 12px 8px 0;
+  border-top: 0;
+  background: var(--ink-700);
+  color: var(--ink-200);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.task-row > .task-open {
+  min-height: var(--tap);
+  padding: 6px 12px 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--paper);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.task-row:hover,
+.task-row.open {
+  background: var(--ink-700);
+}
+
+.task-row.ticked {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.task-tick {
+  display: grid;
+  place-items: center;
+}
+
+.task-tick input {
+  width: 18px;
+  height: 18px;
+}
+
+.task-group-head {
+  padding: 10px 14px;
+  border-top: 1px solid var(--ink-650);
+  background: var(--ink-900);
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.task-number {
+  display: inline-grid;
+  place-items: center;
+  min-width: 34px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 13px;
+  background: var(--status-open);
+  color: var(--white);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.task-number.status-ready_for_review {
+  background: var(--status-review);
+}
+
+.task-number.status-closed {
+  background: var(--status-closed);
+}
+
+.task-chip {
+  justify-self: start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ink-650);
+  color: var(--ink-100);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.task-chip.status-open {
+  color: #ffb3ad;
+}
+
+.task-chip.status-ready_for_review {
+  color: #ffd27a;
+}
+
+.task-chip.status-closed {
+  color: #8fe0ab;
+}
+
+.task-chip.priority-high {
+  background: rgba(232, 52, 42, 0.18);
+  color: #ffb3ad;
+}
+
+.task-chip.priority-low {
+  color: var(--ink-300);
+}
+
+.task-description,
+.task-sheet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-due.overdue {
+  color: #ff8a80;
+  font-weight: 600;
+}
+
+/* --- the panel ------------------------------------------------------------- */
+
+.task-drawer {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 16px 40px;
+  border-left: 1px solid var(--ink-650);
+  background: var(--ink-800);
+}
+
+.task-drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.task-drawer-where {
+  flex: 1 1 auto;
+  color: var(--ink-200);
+  font-size: 14px;
+}
+
+.task-drawer-close {
+  width: var(--tap);
+  height: var(--tap);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--ink-200);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.task-drawer-actions {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.task-history-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+
+.task-history-list li {
+  display: grid;
+  gap: 2px;
+}
+
+/* --- the new task dialog ---------------------------------------------------- */
+
+.new-task-where {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.new-task-where .choice {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.new-task-where .choice.active {
+  border-color: var(--accent);
+  background: rgba(200, 68, 43, 0.1);
+}
+
+.new-task-where .choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.choice-title {
+  font-weight: 600;
+}
+
+.choice-hint {
+  color: var(--ink-200);
+  font-size: 13px;
+}
+
+.new-task-fields,
+.sheet-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+
+/* --- smaller screens --------------------------------------------------------- */
+
+/* An iPad: company and last-updated go, the panel slides over the list. */
+@media (max-width: 1100px) {
+  .tasks-view.with-drawer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .task-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    width: min(400px, 92vw);
+    box-shadow: -12px 0 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .task-head .col-company,
+  .task-head .col-updated,
+  .task-open .col-company,
+  .task-open .col-updated {
+    display: none;
+  }
+
+  .task-row > .task-open {
+    grid-template-columns: 56px 120px 76px minmax(140px, 2fr) minmax(80px, 1fr) minmax(80px, 1fr) 64px;
+  }
+
+  .task-head {
+    grid-template-columns: 40px 56px 120px 76px minmax(140px, 2fr) minmax(80px, 1fr) minmax(80px, 1fr) 64px;
+  }
+}
+
+/* A phone: each task is a card — number and status, description, then the rest. */
+@media (max-width: 640px) {
+  .tasks-main {
+    padding: 10px 10px 40px;
+  }
+
+  .task-head {
+    display: none;
+  }
+
+  .task-row > .task-open {
+    grid-template-columns: auto auto 1fr;
+    grid-auto-rows: auto;
+    gap: 4px 8px;
+    padding: 10px 12px 10px 0;
+  }
+
+  .task-row > .task-open > .task-description {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+
+  /* "A-101 · LEVEL 1 FLOOR PLAN" is how the card says where the task is. */
+  .task-row > .task-open > .task-sheet {
+    grid-column: 1 / -1;
+    white-space: normal;
+  }
+
+  .task-row > .task-open > span:nth-child(n + 5) {
+    grid-column: span 1;
+    color: var(--ink-200);
+    font-size: 13px;
+  }
+
+  .new-task-where,
+  .new-task-fields,
+  .sheet-choice {
+    grid-template-columns: 1fr;
+  }
+
+  .bulk-field input {
+    width: 120px;
+  }
+}

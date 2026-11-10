@@ -106,8 +106,10 @@ registry rather than by a conditional in that consumer:
 | `ItemFieldRegistry` | what else is recorded on a punch item (trade, company…) | domain | keeps the value — a field from a newer build is never deleted |
 | `FieldEditorRegistry` | which input edits each kind of field | presentation | shows the value read-only |
 | `ToolShortcutRegistry` | which key picks a tool | presentation | no key — the tool is still on the rail |
+| `TaskSortRegistry` | how the Tasks tab can sort | domain | sorts by sheet |
+| `TaskGroupRegistry` | how the Tasks tab can group | domain | one group |
 
-Nine sounds like a lot until you notice the alternative: a `switch` in each of
+Eleven sounds like a lot until you notice the alternative: a `switch` in each of
 those consumers, so every new type risks breaking every existing one and
 guarantees merge conflicts on a team working in parallel.
 
@@ -786,6 +788,35 @@ keeps them with the project, and uses them wherever a sheet is named.
 
 `go test` (`sheet_names_test.go`) and `npm run verify -- sheet-names`.
 
+## The Tasks tab
+
+Every task in the project in one list (spec 6): **Sheets / Tasks** in the top
+bar, server mode only.
+
+| Piece | What it does |
+|---|---|
+| `domain/tasks` | `buildTaskRows` (the punch list's numbered items plus priority, lock, last change, off-sheet), filters, sorts and groupings through `TaskSortRegistry` / `TaskGroupRegistry`, and `taskCsv` |
+| `domain/annotations/OffSheetTask` | kind `task`, stored on the project's `~tasks` sheet; `placedAt` makes it a pin with the same id |
+| `domain/details/fields/PriorityField` | High / Medium / Low, read as Medium where none was chosen, edited by `ChoiceFieldEditor` |
+| `EditorService.applyAll` | several changes as one undo step — bulk edit, placing a task — skipping and reporting what the policy refuses |
+| `domain/ports/TaskRepository` | the project's locks, latest changes, and one item's history across sheets; `HttpTaskRepository` |
+| `backend/tasks.go` | `GET /api/projects/{id}/sealed`, `GET /api/projects/{id}/changes/latest`, `GET /api/annotations/{id}/changes` |
+| `presentation/tasks` | `TasksView`, `TaskDrawer`, `NewTaskDialog`, `PlaceTaskDialog`, `BulkBar`, `useTasks` |
+
+- **A task off the drawings is still a markup**, so roles, history, undo and
+  the item fields apply to it with no second code path. Its sheet belongs to
+  no drawing, so it is never in an issued PDF. A markup never moves between
+  sheets, so placing one is a delete and a create with the same id, in one
+  undoable step; its history is read by id across sheets.
+- **Locks across the project**: the Tasks tab fills `ActiveSeals` with every
+  drawing's issued markups, so an issued task is read-only here exactly as on
+  its sheet.
+- **Going to a sheet** (`App.jsx`): the drawing is opened from the library if
+  another is on screen, then the page; `SheetViewer` is handed an `arrival` —
+  a task to select, or the pin tool to arm with a description waiting.
+
+`npm run verify -- tasks-tab` and `go test` (`tasks_test.go`).
+
 ## Staying current
 
 With a team on one server, the open sheet is re-read — markups, who last
@@ -831,8 +862,10 @@ web/src/
                                AccountRepository, ProjectRepository,
                                WorkingCopyReader, UploadLedger,
                                DrawingLibrary, SheetNameRepository,
-                               SheetNameDetector — all CONTRACTS
+                               SheetNameDetector, TaskRepository — all
+                               CONTRACTS
     documents/                 sheetNames — how a sheet is named, and read back
+    tasks/                     the Tasks tab's rows, sorts, groups and CSV
     sheets/                    SheetName, SheetNames, findSheetName — what a
                                sheet is called, read from its title block
     punchlist/                 the schedule (PunchListRegistry, ordinals) and
@@ -861,6 +894,7 @@ web/src/
                                CanvasImageProcessor
     library/                   HttpDrawingLibrary — a project's drawings
     sheets/                    HttpSheetNameRepository — a project's sheet names
+    tasks/                     HttpTaskRepository — locks, last changes, history
 
   presentation/                TIER 1 — React
     ServiceContainer.jsx       COMPOSITION ROOT — the only wiring file
@@ -870,6 +904,7 @@ web/src/
     tools/                     which tool is on after a markup (ToolLatch) and
                                the keys that pick tools (ToolShortcutRegistry)
     sheets/                    sheet names: loading, reading, renaming
+    tasks/                     the Tasks tab: list, panel, new task, bulk edit
     punchlist/                 the punch list view and its loader
     library/                   the project's drawings: the list, the top-bar
                                dialog, opening from disk or from the server
@@ -886,7 +921,7 @@ web/src/
       useAutoFocus.js          focus that survives the gesture that opened it
 
 web/scripts/
-  verify-all.mjs               npm run verify — runs every verify-*.mjs (21
+  verify-all.mjs               npm run verify — runs every verify-*.mjs (22
                                suites); `npm run verify -- photos` runs one
   verify-*.mjs                 one suite per behaviour, no framework
 
@@ -896,6 +931,7 @@ backend/
   access.go                    the role check wrapped around every route
   media.go                     photos
   sheet_names.go               what each sheet is called
+  tasks.go                     the Tasks tab's project-wide reads
   *_schema.sql                 applied at startup (schema.sql is the base)
   *_test.go                    integration tests against punchlist_test
 ```

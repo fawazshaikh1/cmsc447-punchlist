@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 
 import { useServices } from './presentation/ServiceContainer';
 import { useSheetDocument } from './presentation/hooks/useSheetDocument';
@@ -17,6 +17,11 @@ import { DrawingList } from './presentation/library/DrawingList';
 import { LibraryButton } from './presentation/library/LibraryButton';
 import { useSheetNames } from './presentation/sheets/useSheetNames';
 import { RenameSheetDialog } from './presentation/sheets/RenameSheetDialog';
+import { SessionContext } from './presentation/session/useSession';
+import { TasksView } from './presentation/tasks/TasksView';
+import { ViewSwitch } from './presentation/tasks/ViewSwitch';
+import { PIN_KIND } from './domain/annotations';
+import { ToolRegistry } from './domain/tools';
 
 // Loading these three barrels is what registers every annotation type with
 // AnnotationRegistry, every marker component with MarkerRegistry, and every
@@ -64,7 +69,8 @@ export default function App() {
 
   const { scale, rotation, zoomIn, zoomOut, resetZoom, zoomTo, rotateClockwise } = useViewState();
   const { busy: isExporting, message: exportMessage, error: exportError, exportDocument } = useExport();
-  const { editor, exportsFlattened } = useServices();
+  const { editor, exportsFlattened, tasks: taskRepository, library: drawingLibrary } = useServices();
+  const project = useContext(SessionContext)?.project ?? null;
   const { ask, dialog } = useConfirmation();
   // Sheet ids inside the open project — see presentation/session.
   const sheetIdOf = useSheetIdentity();
@@ -75,6 +81,12 @@ export default function App() {
   // title blocks, kept with the project, and renamed by an admin (spec 5.2).
   const sheetNames = useSheetNames({ documentName, sourceFile, pageCount, libraryVersion: library.version });
   const [renamingSheet, setRenamingSheet] = useState(false);
+
+  // Sheets or Tasks (spec 6.1). The Tasks tab is a project's, so it exists in
+  // server mode only — in browser mode there is no project to list.
+  const tasksAvailable = Boolean(taskRepository && project);
+  const [view, setView] = useState('sheets');
+  const showingTasks = tasksAvailable && view === 'tasks';
 
   // Whether the side panel is showing. Lives here rather than in SheetViewer
   // because the `.app-body` grid needs it too, to give the stage the panel's
@@ -121,6 +133,63 @@ export default function App() {
   );
 
   const handleExport = useCallback(() => runExport(false), [runExport]);
+
+  // ---------------------------------------------------------------------------
+  // GOING TO A SHEET FROM THE TASKS TAB (spec 6.4, 6.8)
+  // ---------------------------------------------------------------------------
+  // Open the drawing if another is on screen, then the page, then hand the
+  // sheet what to do there: select a task, or arm the tool a new task is
+  // placed with, its description waiting.
+  const [target, setTarget] = useState(null);
+  const requested = useRef(null);
+  const { openFromLibrary } = library;
+  const goTo = useCallback((next) => {
+    requested.current = null;
+    setTarget(next);
+    setView('sheets');
+  }, []);
+  useEffect(() => {
+    if (!target || isLoading) return;
+    if (target.documentName !== documentName) {
+      if (requested.current === target) return;
+      requested.current = target;
+      if (!drawingLibrary || !project) return;
+      drawingLibrary.list(project.id).then(
+        (drawings) => {
+          const drawing = drawings.find((candidate) => candidate.name === target.documentName);
+          if (drawing) void openFromLibrary(drawing);
+          else setTarget(null);
+        },
+        () => setTarget(null),
+      );
+      return;
+    }
+    const page = `${target.documentName}#${target.pageIndex}`;
+    if (pageIndex !== target.pageIndex && requested.current !== page) {
+      requested.current = page;
+      void openPage(target.pageIndex);
+    }
+  }, [target, isLoading, documentName, pageIndex, drawingLibrary, project, openFromLibrary, openPage]);
+  const arrival =
+    target && page && target.documentName === documentName && target.pageIndex === pageIndex ? target : null;
+
+  // The sheets a new task can go on: every page of the drawing on screen, and
+  // the named sheets of the others.
+  const { labelOf, namedSheets } = sheetNames;
+  const sheetsFor = useCallback(
+    (drawing) => {
+      if (drawing === documentName && pageCount) {
+        return Array.from({ length: pageCount }, (_, index) => ({ pageIndex: index, label: labelOf(drawing, index) }));
+      }
+      const named = namedSheets(drawing)
+        .map((name) => ({ pageIndex: name.pageIndex, label: labelOf(drawing, name.pageIndex) }))
+        .sort((a, b) => a.pageIndex - b.pageIndex);
+      return named.length > 0 ? named : [{ pageIndex: 0, label: 'Sheet 1' }];
+    },
+    [documentName, pageCount, labelOf, namedSheets],
+  );
+  // A new task on a sheet is placed with whichever tool makes pins.
+  const pinToolId = ToolRegistry.all().find((tool) => tool.createsKind() === PIN_KIND)?.getId() ?? null;
 
   /**
    * The flattened export, behind a confirmation.
@@ -189,7 +258,7 @@ export default function App() {
   }, [handleExportFlat]);
 
   return (
-    <div className="app">
+    <div className={showingTasks ? 'app tasks-mode' : 'app'}>
       {dialog}
       {renamingSheet && (
         <RenameSheetDialog
@@ -223,6 +292,7 @@ export default function App() {
         isExporting={isExporting}
         sheetLabelFor={sheetNames.labelFor}
         onRenameSheet={page && sheetNames.canRename ? () => setRenamingSheet(true) : undefined}
+        lead={tasksAvailable ? <ViewSwitch view={view} onChange={setView} /> : null}
       >
         <LibraryButton
           onOpen={(drawing) => void library.openFromLibrary(drawing)}
@@ -268,7 +338,17 @@ export default function App() {
         </div>
       )}
 
-      {page && sheetId ? (
+      {showingTasks ? (
+        <TasksView
+          sheetLabelFor={labelOf}
+          sheetsFor={sheetsFor}
+          openSheet={page && documentName ? { documentName, pageIndex } : null}
+          onOpenOnSheet={goTo}
+          onCreateOnSheet={({ documentName: drawing, pageIndex: index, description }) =>
+            goTo({ documentName: drawing, pageIndex: index, armTool: pinToolId, prefill: description })
+          }
+        />
+      ) : page && sheetId ? (
         <div className={panelOpen ? 'app-body' : 'app-body no-panel'}>
           <SheetViewer
             sheetId={sheetId}
@@ -284,6 +364,8 @@ export default function App() {
             sheetIdFor={sheetIdFor}
             sheetNumberFor={sheetNames.numberFor}
             onSelectPage={(index) => void openPage(index)}
+            arrival={arrival}
+            onArrived={() => setTarget(null)}
           />
         </div>
       ) : (

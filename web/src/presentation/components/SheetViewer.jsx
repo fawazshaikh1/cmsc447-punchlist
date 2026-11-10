@@ -43,12 +43,30 @@ export function SheetViewer({
   // What the punch list calls a sheet — "A-101", or "Sheet N".
   sheetNumberFor = (drawing, index) => `Sheet ${index + 1}`,
   onSelectPage = () => {},
+  // Arriving from the Tasks tab (spec 6.4, 6.8): a task to select, or a tool
+  // to arm with a description already typed. Cleared through onArrived.
+  arrival = null,
+  onArrived = () => {},
 }) {
   // How a tool that declares `requiresText()` gets its text. Owned here rather
   // than inside the hook so the hook stays free of JSX and of any opinion about
   // HOW the question is asked — replacing this modal with an inline editor on
   // the sheet is a change to this file alone.
-  const { ask: promptForText, dialog: promptDialog } = useTextPrompt();
+  const { ask: askText, dialog: promptDialog } = useTextPrompt();
+
+  // A description typed in the Tasks tab's New task, waiting for the pin it
+  // belongs to: the next text prompt opens with it filled in.
+  const prefill = useRef(null);
+  // The tool that description was armed with.
+  const armed = useRef(null);
+  const promptForText = useCallback(
+    (prompt) => {
+      const initialValue = prefill.current;
+      prefill.current = null;
+      return askText(initialValue ? { ...prompt, initialValue } : prompt);
+    },
+    [askText],
+  );
 
   // Photo capture, in two halves that belong in different tiers. The dialog
   // produces a Blob — a presentation concern, it owns a camera and a file
@@ -159,6 +177,32 @@ export function SheetViewer({
         ?.scrollIntoView({ block: 'center', inline: 'center', behavior: 'smooth' });
     });
   }, [editor.selectedId]);
+
+  // Arriving from the Tasks tab, on the right drawing and page already: select
+  // the task and bring it into view, or arm the tool a new task needs with its
+  // description waiting (spec 6.4, 6.8). Answered once, then cleared.
+  useEffect(() => {
+    if (!arrival) return;
+    if (arrival.annotationId) {
+      scrollToSelection.current = true;
+      editor.selectSoon(arrival.annotationId);
+      onPanelOpenChange(true);
+    }
+    if (arrival.armTool) {
+      prefill.current = arrival.prefill ?? null;
+      armed.current = arrival.armTool;
+      latch.press(arrival.armTool);
+    }
+    onArrived();
+    // Only a new arrival is answered; the callbacks change on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arrival]);
+
+  // A description waiting for its pin is dropped if the pin is not placed:
+  // a different tool, or Escape, means the person moved on.
+  useEffect(() => {
+    if (editor.toolId !== armed.current) prefill.current = null;
+  }, [editor.toolId]);
 
   // Keyboard shortcuts. Ctrl/Cmd+Z and Shift+Ctrl/Cmd+Z are what every user
   // already has in their fingers; Delete removes the selection; Escape clears
