@@ -48,6 +48,7 @@ import {
   taskCsv,
 } from '../src/domain/tasks/index.js';
 import { InMemoryAnnotationRepository } from '../src/infrastructure/persistence/InMemoryAnnotationRepository.js';
+import { HttpTaskRepository } from '../src/infrastructure/tasks/HttpTaskRepository.js';
 import { InMemoryChangeLogRepository } from '../src/infrastructure/persistence/InMemoryChangeLogRepository.js';
 
 const checks = [];
@@ -284,6 +285,34 @@ check('a new task with no description is refused, not stored', async () => {
   assert.equal(result.applied.length, 0);
   assert.equal(result.skipped.length, 1);
   assert.deepEqual(await repository.listBySheet(TASKS), []);
+});
+
+// =========================================================================
+// 4b. READING THE PROJECT
+// =========================================================================
+
+check('the HTTP adapter reads the project locks, the latest changes and an item history', async () => {
+  const requests = [];
+  const actor = { id: '3', displayName: 'Pat Power', company: 'Apex Electrical', role: 'power_collaborator' };
+  const change = (id, annotationId, sheetId) => ({ id, annotationId, sheetId, intent: 'update', actor, at: '2026-11-09T10:00:00Z', detail: 'Close' });
+  const fake = async (url) => {
+    const path = new URL(url, 'http://localhost').pathname;
+    requests.push(path);
+    const body = path.endsWith('/sealed')
+      ? ['p2']
+      : path.endsWith('/changes/latest')
+        ? { t1: change('c1', 't1', TASKS) }
+        : [change('c2', 'task 1', SHEET_1), change('c1', 'task 1', TASKS)];
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  const repo = new HttpTaskRepository('/api', fake);
+
+  assert.deepEqual([...(await repo.sealedIds(7))], ['p2']);
+  const latest = await repo.latestChanges(7);
+  assert.equal(String(latest.get('t1').actor), 'Pat Power (Apex Electrical)');
+  const history = await repo.historyFor('task 1');
+  assert.deepEqual(history.map((record) => record.sheetId), [SHEET_1, TASKS]);
+  assert.deepEqual(requests, ['/api/projects/7/sealed', '/api/projects/7/changes/latest', '/api/annotations/task%201/changes']);
 });
 
 // =========================================================================

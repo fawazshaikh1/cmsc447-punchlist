@@ -40,6 +40,7 @@ import { HttpProjectRepository } from '../infrastructure/auth/HttpProjectReposit
 import { HttpDrawingLibrary } from '../infrastructure/library/HttpDrawingLibrary';
 import { HttpSheetNameRepository } from '../infrastructure/sheets/HttpSheetNameRepository';
 import { PdfJsSheetNameDetector } from '../infrastructure/pdf/PdfJsSheetNameDetector';
+import { HttpTaskRepository } from '../infrastructure/tasks/HttpTaskRepository';
 
 /**
  * ===========================================================================
@@ -209,6 +210,9 @@ export function ServiceContainer({
       // either mode.
       sheetNames: api ? new HttpSheetNameRepository(api) : null,
       sheetNameDetector: new PdfJsSheetNameDetector(),
+      // The Tasks tab's project-wide reads — locks, last changes, history
+      // across sheets (spec 6). Server mode only, like the tab itself.
+      tasks: api ? new HttpTaskRepository(api) : null,
       // Both read directly by the editor hook. Exposed because they are domain
       // ports — the presentation layer depending on them is the dependency rule
       // working, not a leak.
