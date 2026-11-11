@@ -61,6 +61,14 @@ proven.
   opens with Pin armed; tap, and the description is already there.
 - **Export CSV** and open it in Excel.
 
+## 3c. Talk about a task, find a sheet (1 min)
+
+- Open a task: under its details, **Comment** — *Closer on order, fitting
+  Thursday.* The sub (step 4) answers with **Reply**; the Tasks tab shows 💬 2.
+- Comment on an issued (🔒) task: allowed — its fields are still locked.
+- ☆ beside the sheet picker stars the sheet. **Bookmarks** → type "a101": A-101
+  opens, even on the other drawing; the starred sheet is one tap back.
+
 ## 4. Bring in the subcontractor (2 min)
 
 - PM: account menu (top right) → **People on this project**. The sub must have
@@ -95,4 +103,4 @@ comes back `403` with the reason.
 | How are passwords stored? | PBKDF2-SHA256, 600,000 iterations, a random salt each. Sessions are HttpOnly cookies; the database holds only their digest. |
 | What stops a collaborator editing? | The server: every write is checked against the role on that project (`backend/access.go`). |
 | How do you add a markup type? | A new class, a marker component and an export writer, each registering itself — no existing file changes. See ARCHITECTURE.md. |
-| How is it tested? | 22 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |
+| How is it tested? | 23 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |
