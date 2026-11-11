@@ -50,6 +50,17 @@ proven.
 - Filter **Overdue**, then a company, then search "door". Tap an item: it goes
   to its sheet and selects it.
 
+## 3b. The Tasks tab (1 min)
+
+- **Tasks** in the top bar: every task in the project, grouped by sheet. Sort
+  by priority; group by company. Tick two, set them to *Ready for review* —
+  one **Undo** puts both back.
+- **New task → Off a sheet**: *Order replacement ceiling tiles*, High. It is
+  G-1. **Place on a sheet** → A-102: the sheet opens with it selected.
+- **New task → On a sheet** → A-201, *Cracked glazing at storefront*: the sheet
+  opens with Pin armed; tap, and the description is already there.
+- **Export CSV** and open it in Excel.
+
 ## 4. Bring in the subcontractor (2 min)
 
 - PM: account menu (top right) → **People on this project**. The sub must have
@@ -84,4 +95,4 @@ comes back `403` with the reason.
 | How are passwords stored? | PBKDF2-SHA256, 600,000 iterations, a random salt each. Sessions are HttpOnly cookies; the database holds only their digest. |
 | What stops a collaborator editing? | The server: every write is checked against the role on that project (`backend/access.go`). |
 | How do you add a markup type? | A new class, a marker component and an export writer, each registering itself — no existing file changes. See ARCHITECTURE.md. |
-| How is it tested? | 21 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |
+| How is it tested? | 22 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |

@@ -36,6 +36,8 @@ const READER_ROLES = new Set(['admin', 'power_collaborator']);
  * @returns {{
  *   labelFor: (pageIndex: number) => string,
  *   numberFor: (documentName: string, pageIndex: number) => string,
+ *   labelOf: (documentName: string, pageIndex: number) => string,
+ *   namedSheets: (documentName: string) => import('../../domain/sheets').SheetName[],
  *   nameFor: (pageIndex: number) => import('../../domain/sheets').SheetName|null,
  *   canRename: boolean,
  *   rename: (pageIndex: number, name: { number: string, title: string }) => Promise<void>,
@@ -173,6 +175,10 @@ export function useSheetNames({ documentName, sourceFile, pageCount, libraryVers
   return {
     labelFor: useCallback((pageIndex) => open.labelFor(pageIndex), [open]),
     numberFor: useCallback((drawing, pageIndex) => namesOf(drawing).numberFor(pageIndex), [namesOf]),
+    // Any drawing's sheets, not only the open one's — for the Tasks tab and
+    // choosing a sheet for a new task (spec 6.4).
+    labelOf: useCallback((drawing, pageIndex) => namesOf(drawing).labelFor(pageIndex), [namesOf]),
+    namedSheets: useCallback((drawing) => namesOf(drawing).toArray(), [namesOf]),
     nameFor: useCallback((pageIndex) => open.nameFor(pageIndex), [open]),
     canRename,
     rename,

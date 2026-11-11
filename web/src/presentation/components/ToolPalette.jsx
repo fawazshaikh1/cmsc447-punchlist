@@ -191,8 +191,10 @@ export function ToolPalette({
               onPointerUp={endHold}
               onPointerLeave={endHold}
               onPointerCancel={endHold}
+              // The tooltip carries the key and the hint; the button's name is
+              // the tool's, so a screen reader — or a test — finds "Pin".
               title={title}
-              aria-label={title}
+              aria-label={tool.getLabel()}
             >
               <Icon name={TOOL_ICONS[id] ?? 'draw'} size={22} />
               <span className="tool-label">{tool.getLabel()}</span>

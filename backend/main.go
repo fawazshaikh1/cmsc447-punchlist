@@ -92,6 +92,11 @@ func routes() http.Handler {
 	mux.HandleFunc("GET /api/projects/{projectID}/sheet-names", handleListSheetNames)
 	mux.HandleFunc("PUT /api/projects/{projectID}/sheet-names/{documentName}", handleSaveSheetNames)
 
+	// The Tasks tab (tasks.go).
+	mux.HandleFunc("GET /api/projects/{projectID}/sealed", handleProjectSealed)
+	mux.HandleFunc("GET /api/projects/{projectID}/changes/latest", handleProjectLatestChanges)
+	mux.HandleFunc("GET /api/annotations/{annotationID}/changes", handleAnnotationHistory)
+
 	return withCORS(requireAppRequest(mux))
 }
 

@@ -35,6 +35,8 @@ import { RequiredDescriptionRule } from './RequiredDescriptionRule';
 // person who dropped it will not remember what they saw by the time the drawing
 // is issued. See the class for the full reasoning.
 AnnotationRuleRegistry.register('pin', new RequiredDescriptionRule());
+// A task off the drawings needs one for the same reason a pin does (spec 6.4).
+AnnotationRuleRegistry.register('task', new RequiredDescriptionRule());
 
 // --- exports ----------------------------------------------------------------
 

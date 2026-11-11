@@ -3,6 +3,7 @@ import { TradeField } from './fields/TradeField';
 import { ResponsibleCompanyField } from './fields/ResponsibleCompanyField';
 import { AssigneeField } from './fields/AssigneeField';
 import { DueDateField } from './fields/DueDateField';
+import { PriorityField } from './fields/PriorityField';
 
 export { CalendarDate } from './CalendarDate';
 export { ItemField } from './ItemField';
@@ -10,7 +11,7 @@ export { TextItemField } from './TextItemField';
 export { DateItemField } from './DateItemField';
 export { ItemFieldRegistry } from './ItemFieldRegistry';
 export { ItemDetails } from './ItemDetails';
-export { TradeField, ResponsibleCompanyField, AssigneeField, DueDateField };
+export { TradeField, ResponsibleCompanyField, AssigneeField, DueDateField, PriorityField };
 
 /**
  * The fields a punch item carries, IN THE ORDER THE PANEL SHOWS THEM.
@@ -27,3 +28,5 @@ ItemFieldRegistry.register(new TradeField());
 ItemFieldRegistry.register(new ResponsibleCompanyField());
 ItemFieldRegistry.register(new AssigneeField());
 ItemFieldRegistry.register(new DueDateField());
+// High, Medium or Low — read as Medium where none was chosen (spec 6.3).
+ItemFieldRegistry.register(new PriorityField());

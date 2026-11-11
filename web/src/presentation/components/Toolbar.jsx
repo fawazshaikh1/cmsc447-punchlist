@@ -45,6 +45,9 @@ const RENAME = 'rename';
  *        is called — "A-101 · LEVEL 1 FLOOR PLAN" — or "Sheet N".
  * @param {() => void} [props.onRenameSheet] Offered to an admin only, as the
  *        last entry in the sheet picker; omitted, the entry is not there.
+ * @param {React.ReactNode} [props.lead] Shown right after the brand — the
+ *        Sheets / Tasks switch in server mode (spec 6.1). A slot, like
+ *        `children`.
  * @param {React.ReactNode} [props.children] Shown at the end of the bar —
  *        the account menu in server mode. A slot, so what sits there is the
  *        app shell's choice and this component needs no edit to change it.
@@ -67,6 +70,7 @@ export function Toolbar({
   isExporting,
   sheetLabelFor = (index) => `Sheet ${index + 1}`,
   onRenameSheet,
+  lead,
   children,
 }) {
   const handleFileChange = (event) => {
@@ -89,6 +93,8 @@ export function Toolbar({
           </span>
           <span className="brand-name">Punch List</span>
         </div>
+
+        {lead}
 
         <label className="btn file-button" title="Open an architectural PDF">
           <Icon name="file" size={18} />

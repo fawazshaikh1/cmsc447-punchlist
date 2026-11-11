@@ -1,3 +1,4 @@
+import { ChoiceFieldEditor } from './ChoiceFieldEditor';
 import { DateFieldEditor } from './DateFieldEditor';
 import { FieldEditorRegistry } from './FieldEditorRegistry';
 import { TextFieldEditor } from './TextFieldEditor';
@@ -14,3 +15,5 @@ export { FieldEditorRegistry } from './FieldEditorRegistry';
  */
 FieldEditorRegistry.register('text', TextFieldEditor);
 FieldEditorRegistry.register('date', DateFieldEditor);
+// Priority's High / Medium / Low (spec 6.3).
+FieldEditorRegistry.register('choice', ChoiceFieldEditor);

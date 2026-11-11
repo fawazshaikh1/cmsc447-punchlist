@@ -354,6 +354,94 @@ export class EditorService {
   }
 
   /**
+   * Several changes as ONE undoable step: a bulk edit from the Tasks tab, a
+   * task created off the drawings, or one placed on a sheet (spec 6.4, 6.6).
+   *
+   * Each change is `{ previous, next }`:
+   *   previous null           creates `next`
+   *   next null               deletes `previous`
+   *   both, same sheet        replaces one with the other
+   *   both, different sheets  deletes `previous` and creates `next` — a markup
+   *                           never moves between sheets (the server refuses
+   *                           it), so a task placed on a sheet is re-made
+   *                           there with the same id, which keeps its history
+   *                           and comments attached.
+   *
+   * A change the policy refuses, or that would leave an item incomplete, is
+   * SKIPPED and reported rather than thrown: ticking a mix of open and issued
+   * tasks and closing them should close the ones that can be closed and say
+   * which could not (spec 9). Every applied change is checked, recorded and
+   * undone exactly as the single-item methods do it.
+   *
+   * @param {{ previous?: import('../annotations/Annotation').Annotation|null, next?: import('../annotations/Annotation').Annotation|null }[]} changes
+   * @param {string} label For the undo button and the history, e.g. 'Close'.
+   * @returns {Promise<{
+   *   applied: import('../annotations/Annotation').Annotation[],
+   *   skipped: { annotation: import('../annotations/Annotation').Annotation, reason: string }[],
+   * }>}
+   */
+  async applyAll(changes, label) {
+    const commands = [];
+    const records = [];
+    const applied = [];
+    const skipped = [];
+    const refuse = (annotation, decision) => {
+      if (decision.denied) skipped.push({ annotation, reason: decision.reason });
+      return decision.denied;
+    };
+
+    for (const { previous = null, next = null } of changes) {
+      if (!previous && !next) continue;
+
+      if (!previous) {
+        if (refuse(next, this.canEdit(next, EditPolicy.INTENT.CREATE))) continue;
+        const problems = this.problemsWith(next);
+        if (problems.length > 0) {
+          skipped.push({ annotation: next, reason: problems[0].message });
+          continue;
+        }
+        commands.push(new AddAnnotationCommand(this.repository, next));
+        records.push([next, EditPolicy.INTENT.CREATE]);
+        applied.push(next);
+      } else if (!next) {
+        if (refuse(previous, this.canEdit(previous, EditPolicy.INTENT.DELETE))) continue;
+        commands.push(new DeleteAnnotationCommand(this.repository, previous));
+        records.push([previous, EditPolicy.INTENT.DELETE]);
+        applied.push(previous);
+      } else if (previous.sheetId !== next.sheetId) {
+        if (refuse(previous, this.canEdit(previous, EditPolicy.INTENT.DELETE))) continue;
+        if (refuse(previous, this.canEdit(next, EditPolicy.INTENT.CREATE))) continue;
+        commands.push(
+          new DeleteAnnotationCommand(this.repository, previous),
+          new AddAnnotationCommand(this.repository, next),
+        );
+        records.push([next, EditPolicy.INTENT.CREATE]);
+        applied.push(next);
+      } else {
+        if (refuse(previous, this.canEdit(previous, EditPolicy.INTENT.UPDATE))) continue;
+        try {
+          this.#requireNoNewProblems(previous, next);
+        } catch (error) {
+          skipped.push({ annotation: previous, reason: error.message });
+          continue;
+        }
+        commands.push(new UpdateAnnotationCommand(this.repository, previous, next, label));
+        records.push([next, EditPolicy.INTENT.UPDATE]);
+        applied.push(next);
+      }
+    }
+
+    if (commands.length === 0) return { applied, skipped };
+
+    await this.history.execute(new CompositeCommand(commands, label));
+    // One entry per item, as `clearSheet` does: someone asking what happened
+    // to item 14 finds the answer on item 14.
+    for (const [annotation, intent] of records) await this.#recordChange(annotation, intent, label);
+
+    return { applied, skipped };
+  }
+
+  /**
    * @returns {Promise<string|null>} Description of what was undone.
    *
    * Recorded like any other change. Undo replays a stored write straight to the
