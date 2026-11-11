@@ -282,6 +282,11 @@
   white-space: nowrap;
 }
 
+.task-comment-count {
+  color: var(--ink-200);
+  font-size: 12px;
+}
+
 .task-due.overdue {
   color: #ff8a80;
   font-weight: 600;

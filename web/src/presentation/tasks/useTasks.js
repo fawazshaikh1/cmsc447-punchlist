@@ -22,26 +22,32 @@ import { SessionContext } from '../session/useSession';
  * @returns {{ rows: import('../../domain/tasks/taskRows').TaskRow[]|null, annotations: import('../../domain/annotations').Annotation[], error: string|null, reload: () => void }}
  */
 export function useTasks({ active, sheetLabelFor }) {
-  const { projects, tasks, activeSeals } = useServices();
+  const { projects, tasks, comments, activeSeals } = useServices();
   const project = useContext(SessionContext)?.project ?? null;
-  const [data, setData] = useState({ annotations: null, sealed: new Set(), latest: new Map(), error: null });
+  const [data, setData] = useState({ annotations: null, sealed: new Set(), latest: new Map(), counts: new Map(), error: null });
   const generation = useRef(0);
 
   const reload = useCallback(() => {
     if (!project || !projects || !tasks) return;
     const mine = ++generation.current;
-    Promise.all([projects.items(project.id), tasks.sealedIds(project.id), tasks.latestChanges(project.id)]).then(
-      ([annotations, sealed, latest]) => {
+    Promise.all([
+      projects.items(project.id),
+      tasks.sealedIds(project.id),
+      tasks.latestChanges(project.id),
+      // How many comments each task has (spec 7.1); none to count without the service.
+      comments ? comments.counts(project.id) : Promise.resolve(new Map()),
+    ]).then(
+      ([annotations, sealed, latest, counts]) => {
         if (mine !== generation.current) return;
         activeSeals.replace(sealed);
-        setData({ annotations, sealed, latest, error: null });
+        setData({ annotations, sealed, latest, counts, error: null });
       },
       (cause) => {
         if (mine !== generation.current) return;
         setData((previous) => ({ ...previous, error: cause instanceof Error ? cause.message : String(cause) }));
       },
     );
-  }, [project, projects, tasks, activeSeals]);
+  }, [project, projects, tasks, comments, activeSeals]);
 
   useEffect(() => {
     if (active) reload();
@@ -68,6 +74,7 @@ export function useTasks({ active, sheetLabelFor }) {
             sheetLabelFor,
             sealedIds: data.sealed,
             lastChanges: data.latest,
+            commentCounts: data.counts,
           })
         : null,
     [data, sheetLabelFor],

@@ -20,6 +20,11 @@ import { RenameSheetDialog } from './presentation/sheets/RenameSheetDialog';
 import { SessionContext } from './presentation/session/useSession';
 import { TasksView } from './presentation/tasks/TasksView';
 import { ViewSwitch } from './presentation/tasks/ViewSwitch';
+import { CommentsSection } from './presentation/comments/CommentsSection';
+import { useBookmarks } from './presentation/bookmarks/useBookmarks';
+import { BookmarkStar } from './presentation/bookmarks/BookmarkStar';
+import { BookmarksMenu } from './presentation/bookmarks/BookmarksMenu';
+import { documentNameOf } from './domain/documents/sheetNames';
 import { PIN_KIND } from './domain/annotations';
 import { ToolRegistry } from './domain/tools';
 
@@ -147,7 +152,7 @@ export default function App() {
     requested.current = null;
     setTarget(next);
     setView('sheets');
-  }, []);
+  }, [setTarget, setView]);
   useEffect(() => {
     if (!target || isLoading) return;
     if (target.documentName !== documentName) {
@@ -188,6 +193,21 @@ export default function App() {
     },
     [documentName, pageCount, labelOf, namedSheets],
   );
+  // Each person's starred sheets, and finding any sheet by its number
+  // (spec 7.2, SRS 4.9.7). Server mode only, like the Tasks tab.
+  const bookmarks = useBookmarks();
+  const { allNamedSheets } = sheetNames;
+  const describeSheet = useCallback(
+    (id) => {
+      const drawing = documentNameOf(id);
+      const page = /#(\d+)$/.exec(String(id));
+      if (!drawing || !page) return null;
+      const index = Number(page[1]);
+      return { documentName: drawing, pageIndex: index, label: labelOf(drawing, index) };
+    },
+    [labelOf],
+  );
+
   // A new task on a sheet is placed with whichever tool makes pins.
   const pinToolId = ToolRegistry.all().find((tool) => tool.createsKind() === PIN_KIND)?.getId() ?? null;
 
@@ -293,7 +313,15 @@ export default function App() {
         sheetLabelFor={sheetNames.labelFor}
         onRenameSheet={page && sheetNames.canRename ? () => setRenamingSheet(true) : undefined}
         lead={tasksAvailable ? <ViewSwitch view={view} onChange={setView} /> : null}
+        sheetExtras={
+          bookmarks.available && sheetId ? (
+            <BookmarkStar starred={bookmarks.isStarred(sheetId)} onToggle={() => void bookmarks.toggle(sheetId)} />
+          ) : null
+        }
       >
+        {bookmarks.available && (
+          <BookmarksMenu starred={bookmarks.ids} describe={describeSheet} sheets={allNamedSheets} onGo={goTo} />
+        )}
         <LibraryButton
           onOpen={(drawing) => void library.openFromLibrary(drawing)}
           version={library.version}
@@ -344,6 +372,8 @@ export default function App() {
           sheetsFor={sheetsFor}
           openSheet={page && documentName ? { documentName, pageIndex } : null}
           onOpenOnSheet={goTo}
+          // The conversation about the open task, as on its sheet (spec 7.1).
+          renderTaskExtras={(row, onChanged) => <CommentsSection annotation={row.annotation} onPosted={onChanged} />}
           onCreateOnSheet={({ documentName: drawing, pageIndex: index, description }) =>
             goTo({ documentName: drawing, pageIndex: index, armTool: pinToolId, prefill: description })
           }

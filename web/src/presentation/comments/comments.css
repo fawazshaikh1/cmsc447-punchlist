@@ -1,0 +1,85 @@
+/* =========================================================================
+   COMMENTS — see presentation/comments/CommentsSection
+   ========================================================================= */
+
+.comments {
+  margin: 16px 0;
+}
+
+.comment-threads,
+.comment-replies {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comment-thread {
+  padding: 10px 12px;
+  border: 1px solid var(--ink-650);
+  border-radius: var(--radius-sm);
+  background: var(--ink-900);
+}
+
+.comment-replies {
+  margin: 10px 0 0 14px;
+  padding-left: 10px;
+  border-left: 2px solid var(--ink-600);
+}
+
+.comment-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  font-size: 13px;
+}
+
+.comment-head time {
+  margin-left: auto;
+}
+
+.comment-text {
+  margin: 4px 0 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comment-reply {
+  min-height: 32px;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-200);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.comment-form {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.comment-form textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  background: var(--ink-800);
+  color: var(--white);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.comment-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
