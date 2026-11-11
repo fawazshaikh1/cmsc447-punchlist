@@ -4,9 +4,9 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-11-10 — Fieldwire release, phase 2: the Tasks tab
+**Last updated:** 2026-11-11 — Fieldwire release, phase 3: comments, bookmarks and finding a sheet
 **Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go + pgx · PostgreSQL 17 · AWS (S3, RDS) planned
-**Codebase:** 260 source files, ~30,650 lines (app and server)
+**Codebase:** 276 source files, ~31,800 lines (app and server)
 
 ---
 
@@ -61,7 +61,8 @@ easy to write.
 | **Select by default, one-shot tools** | **Done** | A tool places one markup and hands back to Select with it open; double-click (hold on a tablet) keeps a tool on; V P B C A D T I pick tools, Esc returns to Select. `verify -- tool-latch` (18 checks); browser at three widths, three roles |
 | **Sheet numbers from the title block** | **Done** | "A-101 · LEVEL 1 FLOOR PLAN" read from each sheet once, kept with the project, renamed by an admin; in the sheet picker, the punch list and the issued schedule. `go test` (6 tests), `verify -- sheet-names` (18 checks); browser |
 | **Tasks tab** | **Done** | Every task in the project in one list: sorted and grouped by sheet (or status, priority, due date, last update), filtered, created on a sheet or off one (G-1, G-2), placed on a sheet later, edited in bulk as one undo step, exported to CSV; a Priority field. `verify -- tasks-tab` (19 checks), 3 Go tests; browser as all three roles at desktop, iPad and phone |
-| Comments and replies | Not started | Sprint 3 — the change log already has a `comment` intent |
+| **Comments and replies** | **Done** | A thread under every task's details, in the side panel and the Tasks tab; replies one level deep; anyone on the project may comment, even on an issued task, whose fields stay locked; the count is on the Tasks tab and in the CSV. `verify -- comments-bookmarks`, 3 Go tests; browser as admin and collaborator |
+| **Sheet bookmarks and search** | **Done** | A star beside the sheet picker keeps a sheet for each person; **Bookmarks** lists them and finds any sheet in the project by number ("a101" finds A-101) or title. `verify -- comments-bookmarks` (8 checks), 2 Go tests; browser at desktop and phone |
 
 ---
 
@@ -136,6 +137,33 @@ embedded font (~300KB per export) — a deliberate Sprint 3 decision.
 ---
 
 ## Session log
+
+### 2026-11-11 — Fieldwire release, phase 3: comments, bookmarks and finding a sheet
+
+- **Comments** sit under a task's details wherever it is opened — the sheet's
+  side panel and the Tasks tab's panel — oldest first, each with who wrote it
+  and when, and **Reply** for one level of answers. A comment is a change
+  record with the `comment` intent, so it is in the task's history too; the
+  server checks the text (required, at most 2,000 characters) and that a reply
+  answers a comment on the same task. Commenting is allowed on an issued task:
+  the seal stops edits, not conversation.
+- The Tasks tab shows **💬 n** beside a task's description, and the CSV has a
+  Comments column — one query counts the whole project.
+- **Bookmarks**: the ☆ beside the sheet picker stars the sheet on screen, for
+  that person only, on every device. The **Bookmarks** menu lists the starred
+  sheets and searches every named sheet in the project: "a101", "A-101" and
+  "a 101" all find A-101, exact numbers first; words match titles.
+- Two new extension slots, named here because they edit existing files:
+  `PropertiesPanel` takes `children` after the details, and `Toolbar` takes
+  `sheetExtras` after the sheet picker.
+
+Verified: `verify -- comments-bookmarks` (8 checks, a new suite), 5 Go tests
+(`comments_test.go`, `bookmarks_test.go`, also under `-race`), 23 suites in
+all, lint, build, and the browser — admin starred a sheet, found A-100 on the
+second drawing by typing "a100" and came back through the bookmark, commented
+in the side panel; the collaborator replied in the Tasks tab (the count went
+from 1 to 2) and commented on an issued task while its fields stayed locked.
+The star and menu add no height to the phone's top bar.
 
 ### 2026-11-10 — Fieldwire release, phase 2: the Tasks tab
 

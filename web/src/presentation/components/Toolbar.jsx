@@ -48,6 +48,8 @@ const RENAME = 'rename';
  * @param {React.ReactNode} [props.lead] Shown right after the brand — the
  *        Sheets / Tasks switch in server mode (spec 6.1). A slot, like
  *        `children`.
+ * @param {React.ReactNode} [props.sheetExtras] Shown right after the sheet
+ *        picker — the bookmark star (spec 7.2).
  * @param {React.ReactNode} [props.children] Shown at the end of the bar —
  *        the account menu in server mode. A slot, so what sits there is the
  *        app shell's choice and this component needs no edit to change it.
@@ -71,6 +73,7 @@ export function Toolbar({
   sheetLabelFor = (index) => `Sheet ${index + 1}`,
   onRenameSheet,
   lead,
+  sheetExtras,
   children,
 }) {
   const handleFileChange = (event) => {
@@ -174,6 +177,8 @@ export function Toolbar({
             </button>
           </div>
         )}
+
+        {pageCount > 0 && sheetExtras}
       </div>
 
       <div className="topbar-actions">

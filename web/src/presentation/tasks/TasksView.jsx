@@ -424,6 +424,11 @@ export function TasksView({ sheetLabelFor, sheetsFor, openSheet, onOpenOnSheet, 
                       <span role="cell" className="task-description">
                         {row.isLocked && <span className="task-lock" title="Issued — read-only">🔒 </span>}
                         {row.description || <span className="muted">No description yet</span>}
+                        {row.comments > 0 && (
+                          <span className="task-comment-count" title={`${row.comments} comment${row.comments === 1 ? '' : 's'}`}>
+                            {' '}💬 {row.comments}
+                          </span>
+                        )}
                       </span>
                       <span role="cell" className="task-sheet">{row.sheetLabel}</span>
                       <span role="cell" className="col-company">{row.company}</span>

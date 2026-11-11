@@ -24,6 +24,8 @@ type ChangeRecord struct {
 	Actor        json.RawMessage `json:"actor"`
 	At           string          `json:"at"`
 	Detail       string          `json:"detail"`
+	// ReplyTo is the comment a reply answers (spec 7.1); empty otherwise.
+	ReplyTo string `json:"replyTo,omitempty"`
 }
 
 // ExportRecord matches the frontend's ExportRecord.toJSON().
@@ -91,14 +93,23 @@ func appendChange(w http.ResponseWriter, r *http.Request, sheetID string) {
 	if len(c.Actor) == 0 || string(c.Actor) == "null" {
 		c.Actor = json.RawMessage("{}")
 	}
+	// A comment needs words, and a reply a comment on the same item to
+	// answer (comments.go).
+	if problem, err := checkComment(r.Context(), c); err != nil {
+		dbError(w, "check comment", err)
+		return
+	} else if problem != "" {
+		jsonError(w, http.StatusBadRequest, problem)
+		return
+	}
 
 	// Append-only: a repeated id (for example a retry after a dropped
 	// connection) is ignored rather than overwritten or duplicated.
 	_, err = db.Exec(r.Context(),
-		`INSERT INTO change_history (id, annotation_id, sheet_id, intent, actor, changed_at, detail)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`INSERT INTO change_history (id, annotation_id, sheet_id, intent, actor, changed_at, detail, reply_to)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, ''))
 		 ON CONFLICT (id) DO NOTHING`,
-		c.ID, c.AnnotationID, sheetID, c.Intent, []byte(c.Actor), at, c.Detail)
+		c.ID, c.AnnotationID, sheetID, c.Intent, []byte(c.Actor), at, c.Detail, c.ReplyTo)
 	if err != nil {
 		dbError(w, "append change", err)
 		return
@@ -106,12 +117,12 @@ func appendChange(w http.ResponseWriter, r *http.Request, sheetID string) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-const changeColumns = `id, annotation_id, sheet_id, intent, actor, changed_at, detail`
+const changeColumns = `id, annotation_id, sheet_id, intent, actor, changed_at, detail, COALESCE(reply_to, '')`
 
 func scanChange(scan func(dest ...interface{}) error) (ChangeRecord, error) {
 	var c ChangeRecord
 	var at time.Time
-	if err := scan(&c.ID, &c.AnnotationID, &c.SheetID, &c.Intent, &c.Actor, &at, &c.Detail); err != nil {
+	if err := scan(&c.ID, &c.AnnotationID, &c.SheetID, &c.Intent, &c.Actor, &at, &c.Detail, &c.ReplyTo); err != nil {
 		return c, err
 	}
 	c.At = jsTime(at)

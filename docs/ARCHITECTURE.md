@@ -380,10 +380,11 @@ had been running all along — see "Accounts, projects and roles" below.
 "undefined edited this item" in front of a stakeholder. It reads "this device",
 which is honest about exactly what we know.
 
-**Threaded comments (FR-11) need no new storage.** `EditPolicy.INTENT` already
-includes `comment`; recording one is a `ChangeRecord` with that intent and the
-text in `detail`, so "who commented" is answered by the query that already
-answers "who edited".
+**Threaded comments (FR-11) needed almost no new storage.** `EditPolicy.INTENT`
+already included `comment`; recording one is a `ChangeRecord` with that intent
+and the text in `detail`, so "who commented" is answered by the query that
+already answers "who edited". A reply adds one nullable column, `reply_to` —
+see "Comments, bookmarks and finding a sheet" below.
 
 `npm run verify` exercises all of this, including a check that signs a user in
 by swapping ONE constructor argument and asserts the log names them — if that
@@ -817,6 +818,36 @@ bar, server mode only.
 
 `npm run verify -- tasks-tab` and `go test` (`tasks_test.go`).
 
+## Comments, bookmarks and finding a sheet
+
+Spec 7: talking about a task where it is, and getting to a sheet fast.
+
+| Piece | What it does |
+|---|---|
+| `domain/comments` | `Comment` (read from a change record) and `threadsOf` — oldest first, replies one level deep, a reply whose comment is gone stands alone |
+| `domain/sheets/searchSheets` | finds a sheet by its number with the punctuation squashed ("a101" is A-101) or by words in its title; exact numbers first, then prefixes |
+| `SealedByExportPolicy` | lets `INTENT.COMMENT` through on an issued markup — the seal stops edits, not conversation |
+| `domain/ports/CommentRepository`, `BookmarkRepository` | a task's comments, posting one, the project's counts; a person's starred sheets; `HttpCommentRepository`, `HttpBookmarkRepository` |
+| `backend/comments.go` | checks a comment as it is recorded (text required, ≤ 2,000 characters, a reply answers a comment on the same task); `GET /api/projects/{id}/comments/counts` |
+| `backend/bookmarks.go` | `sheet_bookmarks`, one row per person and sheet; `GET`, `PUT`, `DELETE /api/projects/{id}/bookmarks/{sheetId}` |
+| `presentation/comments` | `CommentsSection` — the thread, Reply, and the box, shown only to someone who may comment |
+| `presentation/bookmarks` | `useBookmarks`, `BookmarkStar`, `BookmarksMenu` (bookmarks and search) |
+
+- **A comment is a change record**, so it needs no table of its own, appears
+  in the task's history, follows a task placed from off a sheet (same id), and
+  is checked by the same role rule as every write: anyone on the project.
+- **Two slots, added for this phase** rather than editing the panels each time
+  something new belongs in them: `PropertiesPanel` renders `children` after the
+  item details, and `Toolbar` renders `sheetExtras` after the sheet picker.
+  The comments and the star arrive through them from `SheetViewer` and
+  `App.jsx`.
+- **A bookmark is the sheet id** (`p1:A-set.pdf#3`), so it needs no copy of the
+  sheet's name: the menu names it with the project's sheet names at the time
+  it is shown.
+
+`npm run verify -- comments-bookmarks` and `go test` (`comments_test.go`,
+`bookmarks_test.go`).
+
 ## Staying current
 
 With a team on one server, the open sheet is re-read — markups, who last
@@ -862,12 +893,15 @@ web/src/
                                AccountRepository, ProjectRepository,
                                WorkingCopyReader, UploadLedger,
                                DrawingLibrary, SheetNameRepository,
-                               SheetNameDetector, TaskRepository — all
+                               SheetNameDetector, TaskRepository,
+                               CommentRepository, BookmarkRepository — all
                                CONTRACTS
     documents/                 sheetNames — how a sheet is named, and read back
     tasks/                     the Tasks tab's rows, sorts, groups and CSV
+    comments/                  Comment, threadsOf — a task's conversation
     sheets/                    SheetName, SheetNames, findSheetName — what a
-                               sheet is called, read from its title block
+                               sheet is called, read from its title block;
+                               searchSheets — finding one by its number
     punchlist/                 the schedule (PunchListRegistry, ordinals) and
                                the on-screen list (TaskList), sharing numbers
     upload/                    browser work reaching the server: markups,
@@ -895,6 +929,8 @@ web/src/
     library/                   HttpDrawingLibrary — a project's drawings
     sheets/                    HttpSheetNameRepository — a project's sheet names
     tasks/                     HttpTaskRepository — locks, last changes, history
+    comments/                  HttpCommentRepository — a task's comments, counts
+    bookmarks/                 HttpBookmarkRepository — a person's starred sheets
 
   presentation/                TIER 1 — React
     ServiceContainer.jsx       COMPOSITION ROOT — the only wiring file
@@ -905,6 +941,8 @@ web/src/
                                the keys that pick tools (ToolShortcutRegistry)
     sheets/                    sheet names: loading, reading, renaming
     tasks/                     the Tasks tab: list, panel, new task, bulk edit
+    comments/                  CommentsSection — the thread under a task
+    bookmarks/                 the star, the Bookmarks menu and sheet search
     punchlist/                 the punch list view and its loader
     library/                   the project's drawings: the list, the top-bar
                                dialog, opening from disk or from the server
@@ -921,7 +959,7 @@ web/src/
       useAutoFocus.js          focus that survives the gesture that opened it
 
 web/scripts/
-  verify-all.mjs               npm run verify — runs every verify-*.mjs (22
+  verify-all.mjs               npm run verify — runs every verify-*.mjs (23
                                suites); `npm run verify -- photos` runs one
   verify-*.mjs                 one suite per behaviour, no framework
 
@@ -932,6 +970,7 @@ backend/
   media.go                     photos
   sheet_names.go               what each sheet is called
   tasks.go                     the Tasks tab's project-wide reads
+  comments.go, bookmarks.go    checking comments, counting them; starred sheets
   *_schema.sql                 applied at startup (schema.sql is the base)
   *_test.go                    integration tests against punchlist_test
 ```

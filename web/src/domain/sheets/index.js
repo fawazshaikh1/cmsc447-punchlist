@@ -5,3 +5,4 @@
 export { SheetName } from './SheetName';
 export { SheetNames } from './SheetNames';
 export { findSheetName } from './findSheetName';
+export { searchSheets } from './searchSheets';

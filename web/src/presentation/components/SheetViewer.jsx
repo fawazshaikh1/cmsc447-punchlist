@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { usePinchZoom } from '../gestures/usePinchZoom';
+import { CommentsSection } from '../comments/CommentsSection';
 import { PunchListPanel } from '../punchlist/PunchListPanel';
 import { useEarlierSheets } from '../punchlist/useEarlierSheets';
 
@@ -381,7 +382,10 @@ export function SheetViewer({
               // control by capability rather than by checking a type.
               onResize={editor.canResize(editor.selected) ? editor.resize : undefined}
               peers={editor.annotations}
-            />
+            >
+              {/* The conversation about this item (spec 7.1). */}
+              <CommentsSection annotation={editor.selected} />
+            </PropertiesPanel>
           ) : (
             <div className="panel-empty">
               <p className="small">

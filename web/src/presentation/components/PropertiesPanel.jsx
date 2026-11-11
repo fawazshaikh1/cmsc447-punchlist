@@ -72,6 +72,9 @@ const STATUS_LABELS = {
  * @param {import('../../domain/annotations').Annotation[]} [props.peers]
  *        The other markups on the sheet, so detail fields can suggest values
  *        already in use.
+ * @param {React.ReactNode} [props.children] More sections after the item's
+ *        fields — the comments (spec 7.1). A slot, so this panel needs no edit
+ *        for the next one.
  */
 export function PropertiesPanel({
   annotation,
@@ -83,6 +86,7 @@ export function PropertiesPanel({
   lastChange = null,
   onResize,
   peers = [],
+  children,
 }) {
   const { ask, dialog } = useConfirmation();
 
@@ -274,6 +278,8 @@ export function PropertiesPanel({
           peers={peers}
         />
       )}
+
+      {children}
 
       {/* Offered by CAPABILITY, like every other control here: `onResize` is
           passed only when the annotation implements `scaledBy`. A pin has no

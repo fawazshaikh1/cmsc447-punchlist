@@ -179,6 +179,14 @@ export function useSheetNames({ documentName, sourceFile, pageCount, libraryVers
     // choosing a sheet for a new task (spec 6.4).
     labelOf: useCallback((drawing, pageIndex) => namesOf(drawing).labelFor(pageIndex), [namesOf]),
     namedSheets: useCallback((drawing) => namesOf(drawing).toArray(), [namesOf]),
+    // Every named sheet in the project, for finding one by its number (SRS 4.9.7).
+    allNamedSheets: useCallback(
+      () =>
+        [...current.byDrawing.entries()].flatMap(([drawing, names]) =>
+          names.toArray().map((name) => ({ documentName: drawing, pageIndex: name.pageIndex, number: name.number, title: name.title })),
+        ),
+      [current.byDrawing],
+    ),
     nameFor: useCallback((pageIndex) => open.nameFor(pageIndex), [open]),
     canRename,
     rename,
