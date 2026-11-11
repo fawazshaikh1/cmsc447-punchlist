@@ -46,8 +46,12 @@ export class SealedByExportPolicy extends EditPolicy {
    * @param {import('./EditPolicy').EditRequest} request
    * @returns {EditDecision}
    */
-  check({ annotation }) {
+  check({ annotation, intent }) {
     if (!annotation?.id) return EditDecision.allow();
+
+    // A comment does not change the item: the conversation about an issued
+    // task goes on after handover (spec 7.1), and the record stays intact.
+    if (intent === EditPolicy.INTENT.COMMENT) return EditDecision.allow();
 
     if (!this.getSealedIds().has(annotation.id)) return EditDecision.allow();
 

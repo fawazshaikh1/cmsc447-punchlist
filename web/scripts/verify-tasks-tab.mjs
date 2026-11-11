@@ -325,11 +325,18 @@ check('the CSV has a byte-order mark, the agreed columns, and one line per task'
   const [header, ...lines] = csv.slice(1).split('\r\n');
   assert.equal(
     header,
-    'Number,Drawing,Sheet,Description,Status,Priority,Trade,Company,Assigned to,Due date,Overdue,Created,Last updated by,Last updated at',
+    'Number,Drawing,Sheet,Description,Status,Priority,Trade,Company,Assigned to,Due date,Overdue,Created,Last updated by,Last updated at,Comments',
   );
   assert.equal(lines.length, 4);
-  assert.match(lines[1], /^2,A\.pdf,A-101,Ceiling tile stained,Open,Medium,,Metro Drywall,Casey Collab,2026-11-01,Yes,2026-11-01,,$/);
+  assert.match(lines[1], /^2,A\.pdf,A-101,Ceiling tile stained,Open,Medium,,Metro Drywall,Casey Collab,2026-11-01,Yes,2026-11-01,,,0$/);
   assert.match(lines[3], /^G-1,,Not on a sheet,Order tiles,Ready for review,High,/);
+});
+
+check('each task carries its number of comments, in the list and the CSV', () => {
+  const rows = sortTaskRows(rowsOf(project(), { commentCounts: new Map([['p3', 2]]) }), 'sheet');
+  assert.deepEqual(rows.map((row) => [row.id, row.comments]), [['p2', 0], ['p3', 2], ['p1', 0], ['t1', 0]]);
+  const line = taskCsv(rows).split('\r\n')[2];
+  assert.match(line, /^2,.*,2$/);
 });
 
 check('commas, quotes, new lines and accents survive; formula-like text is defused', () => {

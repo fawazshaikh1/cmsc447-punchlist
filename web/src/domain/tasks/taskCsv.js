@@ -29,6 +29,7 @@ const COLUMNS = Object.freeze([
   ['Created', (row) => isoDate(row.createdAt)],
   ['Last updated by', (row) => (row.lastChange ? String(row.lastChange.actor) : '')],
   ['Last updated at', (row) => row.lastChange?.at ?? ''],
+  ['Comments', (row) => String(row.comments ?? 0)],
 ]);
 
 /**
