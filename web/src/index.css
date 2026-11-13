@@ -170,6 +170,12 @@ button:disabled {
 
 .topbar {
   display: flex;
+  /* A bar with more in it than fits wraps to a second row rather than
+     sliding its halves under each other. The breakpoints below keep it to
+     one row down to 1001px; this is what happens if something is added and
+     they are not updated — as when the Tasks switch and Bookmarks arrived. */
+  flex-wrap: wrap;
+  row-gap: 8px;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
@@ -1353,9 +1359,9 @@ button:disabled {
    ------------------------------------------------------------------------ */
 
 /* With a drawing open, the drawing's name is worth more than the product's:
-   below 1440px the brand keeps its mark and gives its name's width to the
+   below 1600px the brand keeps its mark and gives its name's width to the
    file name beside it. */
-@media (max-width: 1439px) {
+@media (max-width: 1599px) {
   .topbar.has-document .brand-name {
     display: none;
   }
@@ -1381,6 +1387,64 @@ button:disabled {
   }
 
   .has-document .file-button .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+/* Above 1000px the document half of the bar is sized from nothing up, not
+   from its full width down. Sized from its full width — the whole file name,
+   the whole sheet title — it asked for more than a laptop has and the bar
+   wrapped while the name could still have shortened. The floor is what the
+   switch, the picker and the star need with the name at a few characters;
+   below it the bar wraps. */
+@media (min-width: 1001px) {
+  .topbar.has-document .topbar-doc {
+    flex: 1 1 0%;
+    min-width: var(--topbar-doc-floor, 540px);
+  }
+}
+
+/* From 1600px the brand shows its name again, and the floor makes room for it. */
+@media (min-width: 1600px) {
+  .topbar.has-document {
+    --topbar-doc-floor: 640px;
+  }
+}
+
+/* 1001–1180px — an iPad in landscape — is one row with 2px less between
+   controls. Measured: at 10px the bar was 13px too wide. */
+@media (min-width: 1001px) and (max-width: 1180px) {
+  .topbar.has-document,
+  .topbar.has-document .topbar-doc,
+  .topbar.has-document .topbar-actions {
+    gap: 8px;
+  }
+}
+
+/* Above 1000px, with a drawing open, the bar holds the Sheets / Tasks switch,
+   the sheet picker and its star as well as everything else. It fits on one
+   row because the labelled buttons other than "Issue PDF" — "Open another",
+   the working copy and Drawings — show their icons only, at every width: on
+   a wide screen the room goes to the drawing's name instead. Each keeps its
+   tooltip and its accessible name. */
+@media (min-width: 1001px) {
+  .has-document .file-button,
+  .has-document .export-working,
+  .has-document .library-button {
+    flex: none;
+    justify-content: center;
+    width: var(--tap);
+    padding: 0;
+  }
+
+  .has-document .file-button .btn-label,
+  .has-document .export-working .btn-label,
+  .has-document .library-button .btn-label {
     position: absolute;
     width: 1px;
     height: 1px;

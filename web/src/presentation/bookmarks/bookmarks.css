@@ -84,6 +84,26 @@
   display: none;
 }
 
+/* With a drawing open the bar is full above 1000px: the menu keeps its star
+   icon, its tooltip and its accessible name, and gives up the word, as the
+   other buttons beside it do. */
+@media (min-width: 1001px) {
+  .topbar.has-document .bookmarks-button {
+    justify-content: center;
+    width: var(--tap);
+    padding: 0;
+  }
+
+  .topbar.has-document .bookmarks-button .btn-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
 /* On a phone the star sits with the sheet picker, on its row. */
 @media (max-width: 560px) {
   .topbar.has-document .bookmark-star {
