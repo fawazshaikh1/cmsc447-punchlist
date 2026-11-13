@@ -6,6 +6,8 @@ import { ServiceContainer } from './presentation/ServiceContainer';
 import { ErrorBoundary, AppErrorFallback } from './presentation/components/ErrorBoundary';
 import { SessionGate } from './presentation/session/SessionGate';
 import './index.css';
+// The light, industrial look over the base tokens — see the file for why.
+import './presentation/theme/field-theme.css';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('Root element #root is missing from index.html.');

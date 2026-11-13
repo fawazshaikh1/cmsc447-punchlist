@@ -941,6 +941,8 @@ web/src/
                                the keys that pick tools (ToolShortcutRegistry)
     sheets/                    sheet names: loading, reading, renaming
     tasks/                     the Tasks tab: list, panel, new task, bulk edit
+    theme/                     field-theme.css — the light, industrial look,
+                               laid over index.css's colour tokens
     comments/                  CommentsSection — the thread under a task
     bookmarks/                 the star, the Bookmarks menu and sheet search
     punchlist/                 the punch list view and its loader
