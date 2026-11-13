@@ -14,7 +14,9 @@
 
 .view-switch-option {
   min-height: 38px;
-  padding: 0 14px;
+  /* 10px, not more: with a drawing open the top bar has to fit on one row at
+     1180px, an iPad in landscape. */
+  padding: 0 10px;
   border: 0;
   border-radius: var(--radius-sm);
   background: transparent;
@@ -440,6 +442,12 @@
     grid-auto-rows: auto;
     gap: 4px 8px;
     padding: 10px 12px 10px 0;
+  }
+
+  /* The number is a pill its own width. Left to stretch, it took the width of
+     whatever else landed in its column — a company name — and became a bar. */
+  .task-row > .task-open > .task-number {
+    justify-self: start;
   }
 
   .task-row > .task-open > .task-description {

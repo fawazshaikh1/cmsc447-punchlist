@@ -1,0 +1,291 @@
+/* ===========================================================================
+   FIELD THEME — the light, industrial look
+   ===========================================================================
+   Construction software is read on a tablet in daylight, on a site, often by
+   someone wearing safety glasses. A dark interface washes out in the sun; a
+   white one with dark text does not. So the work surfaces — the side panel,
+   the Tasks list, dialogs, sign-in — are white with near-black text, and the
+   look borrows from the trade itself: steel-grey chrome, a safety-orange
+   accent, square corners, and condensed capital labels like the ones stencilled
+   on site boxes and printed on drawing title blocks.
+
+   Two rules from index.css still hold:
+
+   1. THE DRAWING IS THE BRIGHTEST THING ON SCREEN. The sheet sits on a
+      steel-grey drafting table, not on the white of the panels, so the paper's
+      edge is still obvious and the linework is not competing with chrome.
+   2. COLOUR IN THE CHROME IS RESERVED. Red, amber, green and blue still mean
+      open, ready for review, closed and note. The accent is a burnt safety
+      orange, far enough from all four not to be read as a status.
+
+   HOW IT WORKS
+   index.css gives every colour token one job: --ink-900 to --ink-600 are
+   surfaces and borders, darkest first, and --ink-500 to --ink-100, --white
+   and --paper are text, strongest last. This file keeps those jobs and swaps
+   the values — light surfaces, dark text — then hands the top bar and the
+   tool rail the steel ramp back. Nothing else in the codebase changes; a new
+   component styled with the tokens is themed with no extra work. What cannot
+   follow the tokens — pale tints tuned to be read on dark, white text on a
+   coloured fill — is put right below, selector by selector.
+
+   Selectors are prefixed with :root so they win however the bundler orders
+   the stylesheets.
+   ------------------------------------------------------------------------ */
+
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&display=swap');
+
+html:root {
+  /* The light ramp — surfaces first, then text. */
+  --field-900: #e6eaee; /* the page behind the panels */
+  --field-800: #ffffff; /* panels, cards, dialogs */
+  --field-700: #f1f4f7; /* a raised control, a hovered row */
+  --field-650: #dde3e9; /* dividers between rows */
+  --field-600: #c3ccd5; /* input and button borders */
+  --field-500: #8f9ba7;
+  --field-400: #66727e;
+  --field-300: #56616d; /* muted text */
+  --field-200: #3c4752; /* secondary text */
+  --field-100: #252e37;
+  --field-strong: #10171e; /* headings, values */
+  --field-text: #19222b; /* body text */
+
+  /* The steel ramp, for the top bar and the tool rail. */
+  --steel-900: #0f151b;
+  --steel-800: #1a232c;
+  --steel-700: #25303b;
+  --steel-650: #2e3a46;
+  --steel-600: #384551;
+  --steel-500: #4d5b69;
+  --steel-400: #6b7886;
+  --steel-300: #919eab;
+  --steel-200: #b1bcc7;
+  --steel-100: #d5dce3;
+
+  /* The drafting table the sheet lies on. */
+  --table: #5d6873;
+  --table-dot: rgba(255, 255, 255, 0.1);
+
+  /* Burnt safety orange. White text on it passes for bold labels. */
+  --accent: #d9480f;
+  --accent-hi: #ec5a14;
+  --accent-dim: #a83a0c;
+  /* Text on any filled accent or status colour. */
+  --on-accent: #ffffff;
+
+  /* Status text on white: the fills stay as they were, the words darken. */
+  --status-open-text: #b42318;
+  --status-review-text: #8a5300;
+  --status-closed-text: #136c34;
+  --note-text: #1d5fb4;
+
+  /* Square, like steel and paper. */
+  --radius-sm: 3px;
+  --radius: 5px;
+  --radius-lg: 7px;
+
+  --label-font: 'IBM Plex Sans Condensed', 'IBM Plex Sans', system-ui, sans-serif;
+  --shadow-float: 0 14px 36px rgba(15, 21, 27, 0.18), 0 2px 6px rgba(15, 21, 27, 0.08);
+
+  --ink-900: var(--field-900);
+  --ink-800: var(--field-800);
+  --ink-700: var(--field-700);
+  --ink-650: var(--field-650);
+  --ink-600: var(--field-600);
+  --ink-500: var(--field-500);
+  --ink-400: var(--field-400);
+  --ink-300: var(--field-300);
+  --ink-200: var(--field-200);
+  --ink-100: var(--field-100);
+  --white: var(--field-strong);
+  --paper: var(--field-text);
+
+  color-scheme: light;
+}
+
+/* --- steel chrome ----------------------------------------------------------- */
+
+:root .topbar,
+:root .tool-rail {
+  --ink-900: var(--steel-900);
+  --ink-800: var(--steel-800);
+  --ink-700: var(--steel-700);
+  --ink-650: var(--steel-650);
+  --ink-600: var(--steel-600);
+  --ink-500: var(--steel-500);
+  --ink-400: var(--steel-400);
+  --ink-300: var(--steel-300);
+  --ink-200: var(--steel-200);
+  --ink-100: var(--steel-100);
+  --white: #ffffff;
+  --paper: #f2f5f7;
+  color-scheme: dark;
+}
+
+/* What opens FROM the top bar is a work surface again: menus and dialogs. */
+:root .topbar .bookmarks-panel,
+:root .topbar .session-menu-popover,
+:root .topbar .modal-backdrop {
+  --ink-900: var(--field-900);
+  --ink-800: var(--field-800);
+  --ink-700: var(--field-700);
+  --ink-650: var(--field-650);
+  --ink-600: var(--field-600);
+  --ink-500: var(--field-500);
+  --ink-400: var(--field-400);
+  --ink-300: var(--field-300);
+  --ink-200: var(--field-200);
+  --ink-100: var(--field-100);
+  --white: var(--field-strong);
+  --paper: var(--field-text);
+  color-scheme: light;
+}
+
+/* The safety stripe: one band of orange under the steel, the product's mark. */
+:root .topbar {
+  border-bottom: 3px solid var(--accent);
+}
+
+:root .brand-mark {
+  border-radius: var(--radius-sm);
+  color: var(--on-accent);
+}
+
+/* --- the drafting table ------------------------------------------------------ */
+
+:root .stage {
+  background-color: var(--table);
+  background-image: radial-gradient(circle at 1px 1px, var(--table-dot) 1px, transparent 0);
+}
+
+/* No drawing open: the page is a light work surface with a card on it. */
+:root .stage.stage-empty {
+  background-color: var(--ink-900);
+  background-image: none;
+}
+
+:root .empty-state {
+  border-color: var(--ink-650);
+  box-shadow: 0 1px 2px rgba(15, 21, 27, 0.06);
+}
+
+/* --- white text on a fill ------------------------------------------------------ */
+
+:root .btn.primary,
+:root .icon-button.is-active,
+:root .modal-actions button.primary,
+:root .size-step:hover:not(:disabled),
+:root .punch-number,
+:root .task-number {
+  color: var(--on-accent);
+}
+
+/* A selected swatch: a dark ring with a white gap, on white. */
+:root .swatch.active {
+  border-color: var(--field-strong);
+}
+
+/* The camera's shutter stays a white button on the dark viewfinder. */
+:root .shutter {
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(15, 21, 27, 0.35);
+}
+
+/* --- words in colour ----------------------------------------------------------- */
+
+:root .error,
+:root .danger,
+:root .fail,
+:root .notice-flag-danger,
+:root .punch-due.overdue,
+:root .task-due.overdue,
+:root .task-chip.status-open,
+:root .task-chip.priority-high {
+  color: var(--status-open-text);
+}
+
+:root .field-error,
+:root .notice-locked,
+:root .notice-incomplete,
+:root .notice-flag-warning,
+:root .task-chip.status-ready_for_review {
+  color: var(--status-review-text);
+}
+
+:root .notice,
+:root .pass,
+:root .task-chip.status-closed {
+  color: var(--status-closed-text);
+}
+
+:root .notice-flag-info {
+  color: var(--note-text);
+}
+
+/* --- floating surfaces: lifted, not glowing ------------------------------------- */
+
+:root .modal,
+:root .bookmarks-panel,
+:root .session-menu-popover,
+:root .task-drawer {
+  box-shadow: var(--shadow-float);
+}
+
+@media (max-width: 1100px) {
+  :root .panel,
+  :root .task-drawer {
+    box-shadow: -10px 0 30px rgba(15, 21, 27, 0.2);
+  }
+}
+
+:root .modal-backdrop {
+  background: rgba(15, 21, 27, 0.55);
+}
+
+/* --- stencilled labels ------------------------------------------------------------ */
+
+/* Section names, column heads and tabs in condensed capitals, like a title
+   block — read at a glance, and visibly different from the data under them. */
+:root .task-head,
+:root .task-group-head,
+:root .panel-tab,
+:root .view-switch-option,
+:root .tool,
+:root .modal h2,
+:root .properties-header h2 {
+  font-family: var(--label-font);
+  letter-spacing: 0.04em;
+}
+
+:root .task-group-head,
+:root .panel-tab,
+:root .view-switch-option {
+  text-transform: uppercase;
+}
+
+:root .task-group-head {
+  background: var(--field-700);
+  color: var(--field-strong);
+  border-left: 3px solid var(--accent);
+}
+
+/* The Tasks list: a register, with a firm head and quiet rows. */
+:root .task-head {
+  background: var(--field-100);
+  color: #ffffff;
+}
+
+:root .task-row:hover,
+:root .task-row.open {
+  background: #fff4ec;
+}
+
+:root .task-row.ticked {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* The selected tab is the one with the orange rule under it. */
+:root .panel-tab[aria-selected='true'] {
+  background: transparent;
+  color: var(--field-strong);
+  box-shadow: inset 0 -3px 0 var(--accent);
+}

@@ -4,7 +4,7 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-11-11 — Fieldwire release, phase 3: comments, bookmarks and finding a sheet
+**Last updated:** 2026-11-13 — the light field theme, for the UI design document
 **Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go + pgx · PostgreSQL 17 · AWS (S3, RDS) planned
 **Codebase:** 276 source files, ~31,800 lines (app and server)
 
@@ -137,6 +137,30 @@ embedded font (~300KB per export) — a deliberate Sprint 3 decision.
 ---
 
 ## Session log
+
+### 2026-11-13 — the light field theme
+
+The interface was dark charcoal throughout. Construction software is read on
+a tablet in daylight, so the work surfaces are now white with near-black
+text, under a steel-grey top bar and tool rail with a safety-orange stripe;
+the drawing lies on a steel-grey drafting table so it is still the brightest
+thing on screen. Labels — the Tasks list's column heads, sheet groups and
+tabs — are in condensed capitals, and corners are square.
+
+- **One new file** (`presentation/theme/field-theme.css`, imported once in
+  `main.jsx`): index.css gives every colour token one job (surface, border or
+  text), so swapping the values relights every screen; the steel ramp is
+  handed back to the top bar and tool rail, and the pale tints made for dark
+  backgrounds are darkened selector by selector.
+- **A bug it exposed**: from about 1440px down the sheet picker and its star
+  were drawn under the zoom controls, since the Tasks switch and Bookmarks
+  arrived. The bar now wraps instead, the drawing's name shortens first, and
+  the labelled buttons other than Issue PDF show icons. One row from 1180px up.
+
+Verified: 23 suites, lint, build, the end-to-end pin test, and the browser at
+375, 768, 1024, 1180, 1280, 1366, 1440, 1600 and 1920px — sheet view, side
+panel, Tasks tab and panel, comments, New task, People, Drawings, Bookmarks
+and the account menu.
 
 ### 2026-11-11 — Fieldwire release, phase 3: comments, bookmarks and finding a sheet
 
