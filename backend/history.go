@@ -306,7 +306,8 @@ func handleSealedIds(w http.ResponseWriter, r *http.Request) {
 	rows, err := db.Query(r.Context(),
 		`SELECT DISTINCT jsonb_array_elements_text(annotation_ids_by_sheet -> $2::text)
 		 FROM export_history
-		 WHERE document_name = $1 AND mode = 'flattened'`, doc, sheetID)
+		 WHERE document_name = $1 AND mode = 'flattened'
+		   AND NOT EXISTS (SELECT 1 FROM export_voids v WHERE v.export_id = export_history.id)`, doc, sheetID)
 	if err != nil {
 		dbError(w, "sealed ids", err)
 		return
