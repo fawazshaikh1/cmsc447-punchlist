@@ -444,6 +444,12 @@
     padding: 10px 12px 10px 0;
   }
 
+  /* The number is a pill its own width. Left to stretch, it took the width of
+     whatever else landed in its column — a company name — and became a bar. */
+  .task-row > .task-open > .task-number {
+    justify-self: start;
+  }
+
   .task-row > .task-open > .task-description {
     grid-column: 1 / -1;
     white-space: normal;
