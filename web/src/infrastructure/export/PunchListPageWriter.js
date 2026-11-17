@@ -1,5 +1,7 @@
 import { StandardFonts, rgb } from 'pdf-lib';
 
+import { CalendarDate } from '../../domain/details/CalendarDate';
+
 /**
  * Appends a punch list schedule to an exported drawing set.
  *
@@ -252,7 +254,8 @@ export class PunchListPageWriter {
     const facts = [
       documentName,
       issuedBy ? `Issued by ${issuedBy}` : null,
-      issuedAt instanceof Date ? `Issued ${issuedAt.toISOString().slice(0, 10)}` : null,
+      // The local day: the UTC one made an evening issue read as tomorrow (SCRUM-82).
+      issuedAt instanceof Date ? `Issued ${CalendarDate.fromLocalDate(issuedAt)}` : null,
       `${total} item${total === 1 ? '' : 's'}`,
       openCount > 0 ? `${openCount} open` : null,
     ].filter(Boolean);
