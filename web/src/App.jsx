@@ -24,6 +24,8 @@ import { CommentsSection } from './presentation/comments/CommentsSection';
 import { useBookmarks } from './presentation/bookmarks/useBookmarks';
 import { BookmarkStar } from './presentation/bookmarks/BookmarkStar';
 import { BookmarksMenu } from './presentation/bookmarks/BookmarksMenu';
+import { useSendBack } from './presentation/reversals/useSendBack';
+import { ReversalsTools } from './presentation/reversals/ReversalsTools';
 import { documentNameOf } from './domain/documents/sheetNames';
 import { PIN_KIND } from './domain/annotations';
 import { ToolRegistry } from './domain/tools';
@@ -77,6 +79,8 @@ export default function App() {
   const { editor, exportsFlattened, tasks: taskRepository, library: drawingLibrary } = useServices();
   const project = useContext(SessionContext)?.project ?? null;
   const { ask, dialog } = useConfirmation();
+  // Sending a task back asks why, wherever its status is changed (spec 8.1).
+  const sendBack = useSendBack();
   // Sheet ids inside the open project — see presentation/session.
   const sheetIdOf = useSheetIdentity();
   // Failures from the checks that run BEFORE the export confirmation, which
@@ -280,6 +284,7 @@ export default function App() {
   return (
     <div className={showingTasks ? 'app tasks-mode' : 'app'}>
       {dialog}
+      {sendBack.dialog}
       {renamingSheet && (
         <RenameSheetDialog
           pageIndex={pageIndex}
@@ -374,6 +379,9 @@ export default function App() {
           onOpenOnSheet={goTo}
           // The conversation about the open task, as on its sheet (spec 7.1).
           renderTaskExtras={(row, onChanged) => <CommentsSection annotation={row.annotation} onPosted={onChanged} />}
+          // Putting accidents right, for admins (spec 8.2, 8.3).
+          renderAdminTools={(onChanged) => <ReversalsTools sheetLabelFor={labelOf} onChanged={onChanged} />}
+          gate={sendBack.gate}
           onCreateOnSheet={({ documentName: drawing, pageIndex: index, description }) =>
             goTo({ documentName: drawing, pageIndex: index, armTool: pinToolId, prefill: description })
           }
@@ -396,6 +404,7 @@ export default function App() {
             onSelectPage={(index) => void openPage(index)}
             arrival={arrival}
             onArrived={() => setTarget(null)}
+            gate={sendBack.gate}
           />
         </div>
       ) : (

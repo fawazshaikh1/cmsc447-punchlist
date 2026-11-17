@@ -102,6 +102,10 @@ func routes() http.Handler {
 	mux.HandleFunc("GET /api/projects/{projectID}/bookmarks", handleListBookmarks)
 	mux.HandleFunc("PUT /api/projects/{projectID}/bookmarks/{sheetID}", handleAddBookmark)
 	mux.HandleFunc("DELETE /api/projects/{projectID}/bookmarks/{sheetID}", handleRemoveBookmark)
+	// Reversing the workflow (spec 8).
+	mux.HandleFunc("GET /api/projects/{projectID}/trash", handleListTrash)
+	mux.HandleFunc("GET /api/projects/{projectID}/issues", handleListIssues)
+	mux.HandleFunc("POST /api/exports/{exportID}/void", handleVoidIssue)
 
 	return withCORS(requireAppRequest(mux))
 }

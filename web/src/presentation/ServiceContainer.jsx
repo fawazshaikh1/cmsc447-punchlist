@@ -43,6 +43,8 @@ import { PdfJsSheetNameDetector } from '../infrastructure/pdf/PdfJsSheetNameDete
 import { HttpTaskRepository } from '../infrastructure/tasks/HttpTaskRepository';
 import { HttpCommentRepository } from '../infrastructure/comments/HttpCommentRepository';
 import { HttpBookmarkRepository } from '../infrastructure/bookmarks/HttpBookmarkRepository';
+import { HttpTrashRepository } from '../infrastructure/reversals/HttpTrashRepository';
+import { HttpIssueRepository } from '../infrastructure/reversals/HttpIssueRepository';
 
 /**
  * ===========================================================================
@@ -218,6 +220,9 @@ export function ServiceContainer({
       // Comments and replies, and each person's starred sheets (spec 7).
       comments: api ? new HttpCommentRepository(api) : null,
       bookmarks: api ? new HttpBookmarkRepository(api) : null,
+      // What admins can put right (spec 8): deleted markups, and voiding an issue.
+      trash: api ? new HttpTrashRepository(api) : null,
+      issues: api ? new HttpIssueRepository(api) : null,
       // Both read directly by the editor hook. Exposed because they are domain
       // ports — the presentation layer depending on them is the dependency rule
       // working, not a leak.

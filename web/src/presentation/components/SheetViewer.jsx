@@ -48,6 +48,9 @@ export function SheetViewer({
   // to arm with a description already typed. Cleared through onArrived.
   arrival = null,
   onArrived = () => {},
+  // Asked before a status change in the side panel is saved — sending a task
+  // back asks why (spec 8.1).
+  gate,
 }) {
   // How a tool that declares `requiresText()` gets its text. Owned here rather
   // than inside the hook so the hook stays free of JSX and of any opinion about
@@ -367,6 +370,7 @@ export function SheetViewer({
             <PropertiesPanel
               annotation={editor.selected}
               onUpdate={editor.update}
+              gate={gate}
               onDelete={editor.remove}
               onClose={() => editor.select(null)}
               // The panel is handed the DECISION, not the reason for it. It shows

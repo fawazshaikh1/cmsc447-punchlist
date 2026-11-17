@@ -57,11 +57,17 @@ const NO_FILTERS = Object.freeze({ status: TaskFilter.ANY, priority: '', company
  *        on screen in the Sheets view, offered first for a new task.
  * @param {(target: { documentName: string, pageIndex: number, annotationId?: string }) => void} props.onOpenOnSheet
  * @param {(target: import('./SheetChoice').SheetPick & { description: string }) => void} props.onCreateOnSheet
- * @param {React.ReactNode} [props.adminTools] More views for admins.
+ * @param {(onChanged: () => void) => React.ReactNode} [props.renderAdminTools]
+ *        More tools in the toolbar — Recently deleted and Issue history
+ *        (spec 8.2, 8.3). `onChanged` re-reads the list after one of them
+ *        changes something.
  * @param {(row) => React.ReactNode} [props.renderTaskExtras] More sections in
  *        a task's panel — comments.
+ * @param {import('../reversals/useSendBack').ChangeGate} [props.gate] Asked
+ *        before status changes are saved, one at a time or ticked in bulk —
+ *        sending tasks back asks why (spec 8.1).
  */
-export function TasksView({ sheetLabelFor, sheetsFor, openSheet, onOpenOnSheet, onCreateOnSheet, renderTaskExtras }) {
+export function TasksView({ sheetLabelFor, sheetsFor, openSheet, onOpenOnSheet, onCreateOnSheet, renderTaskExtras, renderAdminTools, gate }) {
   const { editor, annotations: annotationService, library } = useServices();
   const session = useContext(SessionContext);
   const project = session?.project ?? null;
@@ -157,7 +163,11 @@ export function TasksView({ sheetLabelFor, sheetsFor, openSheet, onOpenOnSheet, 
         refused.push(`${row.number}: ${messageOf(cause)}`);
       }
     }
-    const { applied, skipped } = await editor.applyAll(changes, label);
+    // Sending tasks back asks why, once for all of them.
+    const decision = gate ? await gate(changes) : {};
+    if (!decision) return;
+    const { applied, skipped } = await editor.applyAll(changes, decision.label ?? label);
+    await decision.explain?.(applied);
     const numberOf = (id) => rows.find((row) => row.id === id)?.number ?? '?';
     const notChanged = [...skipped.map(({ annotation }) => numberOf(annotation.id)), ...refused.map((text) => text.split(':')[0])];
     setNotice({
@@ -315,6 +325,7 @@ export function TasksView({ sheetLabelFor, sheetsFor, openSheet, onOpenOnSheet, 
           <button type="button" className="btn" onClick={exportCsv} disabled={shown.length === 0}>
             Export CSV
           </button>
+          {renderAdminTools?.(afterEdit)}
           {mayCreateTask && (
             <button type="button" className="btn primary" onClick={() => setDialog({ kind: 'new' })}>
               New task
@@ -457,6 +468,7 @@ export function TasksView({ sheetLabelFor, sheetsFor, openSheet, onOpenOnSheet, 
           onClose={() => setOpenId(null)}
           onOpenOnSheet={(row) => onOpenOnSheet({ documentName: row.documentName, pageIndex: row.pageIndex, annotationId: row.id })}
           onPlace={mayEdit ? (row) => setDialog({ kind: 'place', row }) : undefined}
+          gate={gate}
         >
           {renderTaskExtras?.(openRow, afterEdit)}
         </TaskDrawer>

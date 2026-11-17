@@ -4,9 +4,9 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-11-13 — the light field theme, for the UI design document
+**Last updated:** 2026-11-17 — Fieldwire release, phase 4: reversing the workflow
 **Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go + pgx · PostgreSQL 17 · AWS (S3, RDS) planned
-**Codebase:** 276 source files, ~31,800 lines (app and server)
+**Codebase:** 292 source files, ~33,200 lines (app and server)
 
 ---
 
@@ -63,6 +63,9 @@ easy to write.
 | **Tasks tab** | **Done** | Every task in the project in one list: sorted and grouped by sheet (or status, priority, due date, last update), filtered, created on a sheet or off one (G-1, G-2), placed on a sheet later, edited in bulk as one undo step, exported to CSV; a Priority field. `verify -- tasks-tab` (19 checks), 3 Go tests; browser as all three roles at desktop, iPad and phone |
 | **Comments and replies** | **Done** | A thread under every task's details, in the side panel and the Tasks tab; replies one level deep; anyone on the project may comment, even on an issued task, whose fields stay locked; the count is on the Tasks tab and in the CSV. `verify -- comments-bookmarks`, 3 Go tests; browser as admin and collaborator |
 | **Sheet bookmarks and search** | **Done** | A star beside the sheet picker keeps a sheet for each person; **Bookmarks** lists them and finds any sheet in the project by number ("a101" finds A-101) or title. `verify -- comments-bookmarks` (8 checks), 2 Go tests; browser at desktop and phone |
+| **Send a task back** | **Done** | Moving a task towards Open (side panel, task panel or bulk bar) asks why, once; recorded as "Send back", the reason posted as a comment on each task that went back. Editors only. `verify -- reversals`, Go role test; browser as admin, power collaborator and collaborator |
+| **Recently deleted** | **Done** | Every markup deleted in the last 30 days, kept by a database trigger; admins restore it with its id, number, fields, comments and history, or are told its drawing has gone. `verify -- reversals`, 3 Go tests; browser |
+| **Void an issue** | **Done** | Issue history lists every issued PDF; an admin voids one with a warning and a reason, which unlocks what only it locked, and it stays in the list marked void. `verify -- reversals` (12 checks), Go tests incl. a later issue still holding; browser |
 
 ---
 
@@ -137,6 +140,49 @@ embedded font (~300KB per export) — a deliberate Sprint 3 decision.
 ---
 
 ## Session log
+
+### 2026-11-17 — Fieldwire release, phase 4: reversing the workflow
+
+Putting accidents right, without asking a developer to edit the database.
+
+- **Send a task back.** Moving a task towards Open — Closed to Ready for
+  review or Open, Ready for review to Open — asks why, once however many
+  tasks are ticked. The change is recorded as "Send back" and the reason is
+  posted as a comment ("Sent back from Ready for review to Open: …") on each
+  task that went back, so whoever does the work sees it; a task in a mixed
+  bulk change that moved forward gets no comment. A collaborator cannot change
+  status at all, so cannot send back.
+- **Recently deleted** (Tasks tab, admins). A database trigger copies every
+  markup as it is deleted — one, ticked in bulk, or a whole sheet cleared —
+  and a second forgets the copy when the markup is saved again, so restore
+  and undo leave nothing behind. The list shows what it was, its sheet, who
+  deleted it and when; copies older than 30 days go when it is read.
+  **Restore** is an ordinary create through the editor with the same id and
+  creation date, so the item keeps its number, fields, comments and history,
+  and Undo deletes it again. A markup whose drawing has left the project is
+  refused with "Its drawing is no longer in the project."
+- **Issue history** (Tasks tab, admins). Every issued PDF with when, by whom
+  and how many markups it locked. **Void issue** warns that copies already
+  sent cannot be recalled, asks why, and records who, when and the reason;
+  the issue stays in the list marked void. The lock queries skip voided
+  issues, so its markups unlock at once — except any a later issue also
+  holds.
+- New slots, named because they edit existing files: a status-change `gate`
+  on `PropertiesPanel`, `TaskDrawer` and `TasksView`, and `TasksView`'s
+  `renderAdminTools` (it was documented in phase 2 but never rendered).
+  `history.go` and `tasks.go` each gained one condition to skip voided issues.
+
+Verified: `verify -- reversals` (12 checks, a new suite), 5 Go tests
+(`reversals_test.go`: the triggers on single delete, clear sheet and re-save;
+the trash's admin check and 30-day window; a drawing that has gone; void and
+unseal with a later issue still holding; refusals for non-admins, a missing
+reason, a native export and voiding twice; who may send back), 24 suites in
+all, lint, build, the end-to-end test, and the browser — a send back from the
+task panel, from the side panel (the comment shows at once) and in bulk;
+a task deleted and restored with its number and comment; a one-markup test
+issue locked a task, was voided, and unlocked it while the other issues kept
+theirs; a power collaborator and a collaborator saw no admin tools and the
+server refused them the trash and the issue list.
 
 ### 2026-11-13 — the light field theme
 
