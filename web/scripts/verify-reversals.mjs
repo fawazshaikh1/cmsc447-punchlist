@@ -7,9 +7,13 @@
  * ===========================================================================
  * 1. A BACKWARD MOVE IS KNOWN AS ONE: Closed → Ready for review or Open, and
  *    Ready for review → Open, ask why; every forward move, and staying put,
- *    does not. A bulk change asks once, about the tasks that go back.
+ *    does not. A bulk change asks once, about the tasks that go back; the
+ *    change is recorded as a send back, and the reason is posted as a comment
+ *    (itself a history record) on each task that went back — never on one
+ *    that did not.
  * 2. A DELETED ITEM COMES BACK WHOLE: the same id, number, fields and creation
  *    date it had — and is refused, with the reason, when its drawing has gone.
+ *    It knows which drawing and page it was on, or that it was on none.
  * 3. A VOIDED ISSUE STAYS IN THE LOG, marked void with who, when and why.
  * 4. THE ADAPTERS speak the server's language: the trash read as markups, an
  *    unreadable row left out rather than failing the list, a void posted with
@@ -20,6 +24,7 @@
 import assert from 'node:assert/strict';
 
 import '../src/domain/annotations/index.js';
+import { OffSheetTask } from '../src/domain/annotations/OffSheetTask.js';
 import { Pin, PinStatus } from '../src/domain/annotations/Pin.js';
 import { PdfPoint } from '../src/domain/geometry/PdfPoint.js';
 import { Actor } from '../src/domain/identity/Actor.js';
@@ -83,6 +88,37 @@ check('a send back says where it went and why, in words for the history', () => 
   );
 });
 
+check('sending back plans one label and one comment per task that goes back', () => {
+  const changes = [
+    { previous: pin('a', CLOSED), next: pin('a', OPEN) },
+    { previous: pin('b', READY), next: pin('b', OPEN) },
+  ];
+  const plan = StatusTransition.planSendBack(changes, '  Hinge still loose  ');
+  // A label, not a sentence: Undo adds the item to it ("Send back pin").
+  assert.equal(plan.label, 'Send back');
+  assert.deepEqual(
+    plan.comments.map(({ annotation, text }) => [annotation.id, annotation.status, text]),
+    [
+      ['a', OPEN, 'Sent back from Closed to Open: Hinge still loose'],
+      ['b', OPEN, 'Sent back from Ready for review to Open: Hinge still loose'],
+    ],
+  );
+});
+
+check('a mix of moves keeps the caller\u2019s label and explains only the tasks that went back', () => {
+  const changes = [
+    { previous: pin('a', CLOSED), next: pin('a', READY) },
+    { previous: pin('b', OPEN), next: pin('b', READY) },
+  ];
+  const plan = StatusTransition.planSendBack(changes, 'Not finished');
+  assert.equal(plan.label, null);
+  assert.deepEqual(plan.comments.map(({ annotation }) => annotation.id), ['a']);
+  assert.deepEqual(StatusTransition.planSendBack([{ previous: pin('c', OPEN), next: pin('c', CLOSED) }], 'x'), {
+    label: null,
+    comments: [],
+  });
+});
+
 // =========================================================================
 // 2. RECENTLY DELETED
 // =========================================================================
@@ -104,6 +140,19 @@ check('a deleted item comes back with its id, fields and creation date', () => {
   assert.equal(item.deletedAt.toISOString(), '2026-11-10T15:00:00.000Z');
   assert.equal(String(item.deletedBy), 'Pat Admin (GC)');
   assert.equal(item.restoreRefusal(), null);
+});
+
+check('a deleted item knows its drawing and page, and an off-sheet task that it had none', () => {
+  const item = DeletedItem.fromJSON(trashRow({ sheetId: 'p7:Set #2.pdf#3' }));
+  assert.equal(item.documentName, 'Set #2.pdf');
+  assert.equal(item.pageIndex, 3);
+  assert.equal(item.isOffSheet, false);
+  const task = DeletedItem.fromJSON({
+    ...new OffSheetTask('t-1', 'p7:~tasks#0', 'Order tiles', OPEN, new Date('2026-11-01T09:00:00Z')).toJSON(),
+    deletedAt: '2026-11-10T15:00:00Z',
+    deletedBy: null,
+  });
+  assert.equal(task.isOffSheet, true);
 });
 
 check('an item whose drawing has gone is refused, with the reason', () => {

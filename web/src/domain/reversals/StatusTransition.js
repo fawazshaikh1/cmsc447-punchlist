@@ -45,6 +45,37 @@ export class StatusTransition {
   }
 
   /**
+   * What a send back writes down (spec 8.1). The change itself is recorded as
+   * "Send back" — a label, not a sentence, because Undo adds the item to it
+   * ("Send back pin"). The reason is posted as a comment on each task that
+   * went back: a comment is a history record, so the reason is in the task's
+   * history, and it is where the person doing the work will see it.
+   *
+   * The label is only replaced when every change goes back to the same
+   * status: a bulk change that moves some tasks forward keeps its own words
+   * ("Set status to Ready for review") rather than calling all of them sent
+   * back. Its comments still explain the ones that did go back.
+   *
+   * @template {{ previous?: object|null, next?: object|null }} Change
+   * @param {Change[]} changes
+   * @param {string} reason As typed; trimmed here.
+   * @returns {{ label: string|null, comments: { annotation: object, text: string }[] }}
+   */
+  static planSendBack(changes, reason) {
+    const back = StatusTransition.backwardIn(changes);
+    const why = String(reason).trim();
+    const targets = new Set(back.map(({ next }) => next.status));
+    const allBack = back.length > 0 && back.length === changes.length && targets.size === 1;
+    return {
+      label: allBack ? 'Send back' : null,
+      comments: back.map(({ previous, next }) => ({
+        annotation: next,
+        text: StatusTransition.sendBackComment(previous.status, next.status, why),
+      })),
+    };
+  }
+
+  /**
    * What the undo button and the status record say.
    * @param {string} to
    */

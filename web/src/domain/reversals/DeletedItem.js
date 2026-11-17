@@ -1,5 +1,7 @@
 import { AnnotationRegistry } from '../annotations/AnnotationRegistry';
+import { documentNameOf } from '../documents/sheetNames';
 import { Actor } from '../identity/Actor';
+import { isOffSheet } from '../tasks/offSheet';
 
 /**
  * A markup someone deleted in the last 30 days (spec 8.2): the markup itself,
@@ -26,6 +28,22 @@ export class DeletedItem {
     this.deletedBy = deletedBy;
     this.drawingRemoved = Boolean(drawingRemoved);
     Object.freeze(this);
+  }
+
+  /** @returns {boolean} A task that was on no drawing (G-1, G-2…). */
+  get isOffSheet() {
+    return isOffSheet(this.annotation.sheetId);
+  }
+
+  /** @returns {string|null} The drawing it was on; null for an off-sheet task. */
+  get documentName() {
+    return this.isOffSheet ? null : documentNameOf(this.annotation.sheetId);
+  }
+
+  /** @returns {number} Its page on that drawing, from zero. */
+  get pageIndex() {
+    const match = /#(\d+)$/.exec(this.annotation.sheetId);
+    return match ? Number(match[1]) : 0;
   }
 
   /**

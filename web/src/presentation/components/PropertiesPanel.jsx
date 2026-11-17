@@ -75,6 +75,9 @@ const STATUS_LABELS = {
  * @param {React.ReactNode} [props.children] More sections after the item's
  *        fields — the comments (spec 7.1). A slot, so this panel needs no edit
  *        for the next one.
+ * @param {import('../reversals/useSendBack').ChangeGate} [props.gate] Asked
+ *        before a status change is saved — sending a task back asks why
+ *        (spec 8.1). A slot too: what is asked is not this panel's business.
  */
 export function PropertiesPanel({
   annotation,
@@ -87,6 +90,7 @@ export function PropertiesPanel({
   onResize,
   peers = [],
   children,
+  gate,
 }) {
   const { ask, dialog } = useConfirmation();
 
@@ -159,7 +163,12 @@ export function PropertiesPanel({
       if (!confirmed) return;
     }
 
-    onUpdate(annotation, annotation.withStatus(next), 'Set status of');
+    const proposed = annotation.withStatus(next);
+    const decision = gate ? await gate([{ previous: annotation, next: proposed }]) : {};
+    if (!decision) return;
+    // Why, before the change: saving re-reads the item, and its comments with it.
+    await decision.explain?.([proposed]);
+    onUpdate(annotation, proposed, decision.label ?? 'Set status of');
   };
 
   const descriptionProblem = problemFor('label');
