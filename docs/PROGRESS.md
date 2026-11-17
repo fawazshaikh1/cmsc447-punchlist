@@ -4,7 +4,7 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-11-17 — Fieldwire release, phase 4: reversing the workflow
+**Last updated:** 2026-11-17 — three small fixes (SCRUM-82, 83, 84)
 **Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go + pgx · PostgreSQL 17 · AWS (S3, RDS) planned
 **Codebase:** 292 source files, ~33,200 lines (app and server)
 
@@ -140,6 +140,30 @@ embedded font (~300KB per export) — a deliberate Sprint 3 decision.
 ---
 
 ## Session log
+
+### 2026-11-17 — three small fixes (SCRUM-82, 83, 84)
+
+- **An evening issue printed tomorrow's date (SCRUM-82).** The schedule's
+  Issued date, each row's raised-on date and a pin note's Created date were
+  the UTC day (`toISOString`), so after 7 or 8 pm in Maryland they read as the
+  next day. They are now the local day, through `CalendarDate.fromLocalDate`,
+  which due dates already used. `verify -- punchlist` runs in Eastern time and
+  checks all three for a pin made at 9:30 pm.
+- **Re-issuing warned about markups already locked (SCRUM-83).** The question
+  before an issue counted every markup on the drawing: "21 will become
+  permanent" when an earlier issue had locked 10. `ExportService.summarize`
+  now counts only what is not locked yet — incomplete pins included — and the
+  question says how many were already locked. `verify -- sealing`.
+- **Backspace in a drop-down deleted the selected markup (SCRUM-84).** The
+  sheet's key handler stood aside for text fields but not for drop-downs, and
+  the sheet picker, Status and Priority keep focus after use. Delete and
+  Backspace are ignored there now. A new end-to-end test,
+  `e2e/keys-in-dropdowns.spec.js`, presses both in the sheet picker and in
+  Status, then checks Delete still deletes once focus has moved on.
+
+Verified: 24 suites, `go test -race`, lint, build, both end-to-end tests, and
+the issue question in the browser on a part-issued drawing ("11 markups … 10
+more were locked by an earlier issue"), cancelled without issuing.
 
 ### 2026-11-17 — Fieldwire release, phase 4: reversing the workflow
 
