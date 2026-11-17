@@ -236,6 +236,11 @@ export function SheetViewer({
         return;
       }
       if ((event.key === 'Delete' || event.key === 'Backspace') && editor.selected) {
+        // Not from a drop-down. The sheet picker, a status or a priority keeps
+        // focus after it is used, and Backspace there deleted the markup on the
+        // sheet (SCRUM-84). Undo and Escape still work there: a drop-down has
+        // no meaning of its own for them.
+        if (target instanceof HTMLElement && target.tagName === 'SELECT') return;
         event.preventDefault();
         // A keyboard shortcut bypasses the disabled Delete button, so the lock
         // has to be honoured here too. EditorService would refuse the write
