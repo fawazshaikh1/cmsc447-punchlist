@@ -252,6 +252,24 @@ check('seals are recovered from history for a sheet, across a restart', async ()
   assert.equal(other.size, 0);
 });
 
+check('SCRUM-83: the re-issue question counts only what is not locked yet', async () => {
+  const app = build();
+  await app.editor.add(pin('first'));
+  await app.editor.add(pin('second'));
+  await issue(app.exportFlat, app);
+
+  await app.editor.add(pin('third'));
+  // Placed before descriptions were required, so stored without one.
+  await app.repository.save(pin('legacy', ''));
+
+  const ask = () => app.exportFlat.summarize({ pageCount: 1, sheetIdFor: () => SHEET, documentName: DOCUMENT });
+  assert.deepEqual(await ask(), { annotationCount: 2, sheetCount: 1, incompleteCount: 1, alreadyLockedCount: 2 });
+
+  // Issued again: nothing new is left to lock, so there is nothing to warn of.
+  await issue(app.exportFlat, app);
+  assert.deepEqual(await ask(), { annotationCount: 0, sheetCount: 0, incompleteCount: 0, alreadyLockedCount: 4 });
+});
+
 check('an export that sealed nothing does not write a record', async () => {
   const app = build();
   const result = await issue(app.exportFlat, app);

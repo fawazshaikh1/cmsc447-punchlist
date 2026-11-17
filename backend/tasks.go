@@ -38,6 +38,7 @@ func handleProjectSealed(w http.ResponseWriter, r *http.Request) {
 		 CROSS JOIN LATERAL jsonb_array_elements_text(
 		   CASE WHEN jsonb_typeof(s.list) = 'array' THEN s.list ELSE '[]'::jsonb END) AS ids(id)
 		 WHERE e.mode = 'flattened' AND s.sheet_id LIKE $1
+		   AND NOT EXISTS (SELECT 1 FROM export_voids v WHERE v.export_id = e.id)
 		 ORDER BY ids.id`, projectSheets(projectID))
 	if err != nil {
 		dbError(w, "project sealed ids", err)
