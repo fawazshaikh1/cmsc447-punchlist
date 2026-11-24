@@ -145,10 +145,7 @@ export function TaskDrawer({ row, peers, onSave, onClose, onOpenOnSheet, onPlace
           <ol className="task-history-list">
             {history.map((record) => (
               <li key={record.id}>
-                <span>
-                  {record.describe()}
-                  {record.detail && record.intent !== 'comment' ? ` — ${record.detail}` : ''}
-                </span>
+                <span>{record.describeWithDetail()}</span>
                 <time className="muted small" dateTime={record.at}>
                   {WHEN.format(new Date(record.at))}
                 </time>

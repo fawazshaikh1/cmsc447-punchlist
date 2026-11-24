@@ -406,6 +406,98 @@ check('a comment will need no new storage — the intent already fits', async ()
   assert.equal(record.describe(), 'this device commented on it');
 });
 
+check('an item\'s history tells each change as one whole sentence', async () => {
+  // The task panel's History once read "edited it — Set trade of" and "added
+  // it — Added": it printed the undo button's label after the sentence, and
+  // that label is written for Undo to finish with the item ("Undo: Set trade
+  // of pin"). Saved here exactly as the item details panel saves a field.
+  const { TradeField } = await import('../src/domain/details/index.js');
+  const rivera = new Actor({ id: 'usr_7f3a', displayName: 'J. Rivera', company: 'Apex Electrical', role: 'admin' });
+  const { editor, changeLog } = build({ identity: new StaticIdentityProvider(rivera) });
+  const trade = new TradeField();
+
+  const created = pin('a', 'Cracked tile');
+  await editor.add(created);
+  const traded = created.withDetail(trade.getKey(), 'Electrical');
+  await editor.update(created, traded, trade.describeChange('Electrical'));
+  assert.equal(editor.peekUndo(), 'Set trade of pin', 'the undo button keeps its own words');
+  await editor.move(traded, 5, 5);
+  await editor.undo();
+
+  const history = await changeLog.listForAnnotation(SHEET, 'a');
+  assert.deepEqual(
+    history.reverse().map((record) => record.describeWithDetail()),
+    [
+      'J. Rivera (Apex Electrical) added it',
+      'J. Rivera (Apex Electrical) edited it — set the trade',
+      'J. Rivera (Apex Electrical) moved it',
+      'J. Rivera (Apex Electrical) edited it — undid move pin',
+    ],
+  );
+});
+
+check('history already stored reads whole too', async () => {
+  // Rows come back from the server as they were written, labels and all, so
+  // the wording is settled when a record is read — not only for new changes.
+  const { ChangeRecord } = await import('../src/domain/audit/ChangeRecord.js');
+  const say = (intent, detail) =>
+    new ChangeRecord({
+      id: 'c1',
+      annotationId: 'a',
+      sheetId: SHEET,
+      intent,
+      actor: Actor.ANONYMOUS,
+      at: '2026-11-24T15:16:00.000Z',
+      detail,
+    }).describeWithDetail();
+
+  assert.equal(say('update', 'Set trade of'), 'this device edited it — set the trade');
+  assert.equal(say('update', 'Confirm the location of'), 'this device edited it — confirm the location');
+  assert.equal(say('update', 'Clear due date of'), 'this device edited it — clear the due date');
+  assert.equal(say('create', 'Added'), 'this device added it');
+  assert.equal(say('delete', 'Deleted'), 'this device deleted it');
+  assert.equal(say('move', 'Move'), 'this device moved it');
+
+  // A label that already says the whole thing follows the sentence as written.
+  assert.equal(say('update', 'Set status to Ready for review'), 'this device edited it — set status to Ready for review');
+  assert.equal(say('update', 'Undid set due date of pin'), 'this device edited it — undid set due date of pin');
+
+  // A comment's detail is its text, which the thread under it shows.
+  assert.equal(say('comment', 'Looks done to me'), 'this device commented on it');
+  assert.equal(say('update', ''), 'this device edited it');
+});
+
+check('no item field leaves a history line hanging', async () => {
+  // Each field words its own change for the undo button — and the next field
+  // to be added will too. Whatever it says, set or cleared, the line must not
+  // stop mid-phrase the way "edited it — Set trade of" did.
+  const { ItemFieldRegistry } = await import('../src/domain/details/index.js');
+  const { ChangeRecord } = await import('../src/domain/audit/ChangeRecord.js');
+  assert.ok(ItemFieldRegistry.all().length > 0, 'the fields must be registered for this to prove anything');
+
+  for (const field of ItemFieldRegistry.all()) {
+    for (const value of ['a value', '']) {
+      const detail = field.describeChange(value);
+      const line = new ChangeRecord({
+        id: 'c1',
+        annotationId: 'a',
+        sheetId: SHEET,
+        intent: 'update',
+        actor: Actor.ANONYMOUS,
+        at: '2026-11-24T15:16:00.000Z',
+        detail,
+      }).describeWithDetail();
+
+      assert.match(line, /^this device edited it/, `${field.getLabel()}: "${detail}" must still name who did it`);
+      assert.doesNotMatch(
+        line,
+        / (of|to|for|on|at|from|with|by)$/,
+        `${field.getLabel()}: "${detail}" reads "${line}", which stops mid-phrase`,
+      );
+    }
+  }
+});
+
 // =========================================================================
 // PART 3 — resizing
 // =========================================================================
