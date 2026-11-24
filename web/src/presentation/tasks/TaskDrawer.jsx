@@ -29,8 +29,10 @@ const WHEN = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle
  *        drawings, to someone who may place it.
  * @param {number} props.revision Changes after every save, so the history re-reads.
  * @param {React.ReactNode} [props.children] More sections — comments.
+ * @param {import('../reversals/useSendBack').ChangeGate} [props.gate] Asked
+ *        before a status change is saved — sending a task back asks why.
  */
-export function TaskDrawer({ row, peers, onSave, onClose, onOpenOnSheet, onPlace, revision, children }) {
+export function TaskDrawer({ row, peers, onSave, onClose, onOpenOnSheet, onPlace, revision, children, gate }) {
   const { editor, tasks } = useServices();
   const { ask, dialog } = useConfirmation();
   // Filed under the task and revision it was read for, so a different task
@@ -69,7 +71,12 @@ export function TaskDrawer({ row, peers, onSave, onClose, onOpenOnSheet, onPlace
       });
       if (!confirmed) return;
     }
-    await onSave(annotation, annotation.withStatus(next), 'Set status of');
+    const proposed = annotation.withStatus(next);
+    const decision = gate ? await gate([{ previous: annotation, next: proposed }]) : {};
+    if (!decision) return;
+    // Why, before the change: saving re-reads the task, and its comments with it.
+    await decision.explain?.([proposed]);
+    await onSave(annotation, proposed, decision.label ?? 'Set status of');
   };
 
   return (

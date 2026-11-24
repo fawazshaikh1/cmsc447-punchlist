@@ -186,7 +186,8 @@ Every write in the application goes through `EditorService`, and every one of
 them asks an `EditPolicy` first. That single choke point is what makes two very
 different-looking requirements the same piece of code:
 
-* a markup that has been **issued in a flattened PDF** cannot be changed;
+* a markup that has been **issued in a flattened PDF** cannot be changed
+  (until an admin voids that issue — see "Reversing the workflow");
 * a user whose **project role** does not cover a change cannot make it.
 
 Both are the question *may this be changed right now?*. A policy answers about
@@ -848,6 +849,38 @@ Spec 7: talking about a task where it is, and getting to a sheet fast.
 `npm run verify -- comments-bookmarks` and `go test` (`comments_test.go`,
 `bookmarks_test.go`).
 
+## Reversing the workflow
+
+Spec 8: putting accidents right, by the people allowed to, with a record.
+
+| Piece | What it does |
+|---|---|
+| `domain/reversals/StatusTransition` | which status moves go back (Open < Ready for review < Closed), and what a send back writes: the label "Send back" and one comment per task that went back |
+| `domain/reversals/DeletedItem` | a deleted markup as it was, who deleted it and when, which drawing and page; refuses a restore when its drawing has gone |
+| `domain/reversals/IssueRecord` | an issued PDF and, once voided, who, when and why |
+| `domain/ports/TrashRepository`, `IssueRepository` | `HttpTrashRepository`, `HttpIssueRepository` |
+| `backend/reversals.go` | `annotation_trash` and its two triggers, `export_voids`; `GET /api/projects/{id}/trash`, `GET /api/projects/{id}/issues`, `POST /api/exports/{id}/void` — all admin only |
+| `presentation/reversals` | `useSendBack` (the gate), `ReversalsTools`, `RecentlyDeletedDialog`, `IssueHistoryDialog` |
+
+- **Sending back is a gate, not a branch.** `PropertiesPanel`, `TaskDrawer`
+  and `TasksView` each take a `gate`: asked before a status change is saved,
+  it can cancel it, relabel it, and explain it afterwards. `useSendBack` is
+  the one gate today, made once in `App.jsx`; the panels know nothing about
+  sending back. For one task the reason is posted before the save, because
+  the save re-reads the item and its comments; for a bulk change it is
+  posted after, on the tasks that were actually changed.
+- **No delete path can skip the trash**, because the copy is made by a
+  database trigger rather than by each handler. Saving the same id again —
+  restore, undo, a task placed on a sheet — removes the copy.
+- **Restoring is a create.** It goes through `EditorService.applyAll` like any
+  other change: checked by the policy, recorded, undoable, and back with its
+  original id and creation date, so its number and history return with it.
+- **A void lifts only its own locks.** The issue stays in `export_history`;
+  both lock queries skip exports with a row in `export_voids`, so a markup a
+  later issue also holds stays locked.
+
+`npm run verify -- reversals` and `go test` (`reversals_test.go`).
+
 ## Staying current
 
 With a team on one server, the open sheet is re-read — markups, who last
@@ -894,11 +927,14 @@ web/src/
                                WorkingCopyReader, UploadLedger,
                                DrawingLibrary, SheetNameRepository,
                                SheetNameDetector, TaskRepository,
-                               CommentRepository, BookmarkRepository — all
+                               CommentRepository, BookmarkRepository,
+                               TrashRepository, IssueRepository — all
                                CONTRACTS
     documents/                 sheetNames — how a sheet is named, and read back
     tasks/                     the Tasks tab's rows, sorts, groups and CSV
     comments/                  Comment, threadsOf — a task's conversation
+    reversals/                 StatusTransition, DeletedItem, IssueRecord —
+                               putting accidents right
     sheets/                    SheetName, SheetNames, findSheetName — what a
                                sheet is called, read from its title block;
                                searchSheets — finding one by its number
@@ -931,6 +967,7 @@ web/src/
     tasks/                     HttpTaskRepository — locks, last changes, history
     comments/                  HttpCommentRepository — a task's comments, counts
     bookmarks/                 HttpBookmarkRepository — a person's starred sheets
+    reversals/                 HttpTrashRepository, HttpIssueRepository
 
   presentation/                TIER 1 — React
     ServiceContainer.jsx       COMPOSITION ROOT — the only wiring file
@@ -945,6 +982,7 @@ web/src/
                                laid over index.css's colour tokens
     comments/                  CommentsSection — the thread under a task
     bookmarks/                 the star, the Bookmarks menu and sheet search
+    reversals/                 send back, Recently deleted, Issue history
     punchlist/                 the punch list view and its loader
     library/                   the project's drawings: the list, the top-bar
                                dialog, opening from disk or from the server
@@ -961,7 +999,7 @@ web/src/
       useAutoFocus.js          focus that survives the gesture that opened it
 
 web/scripts/
-  verify-all.mjs               npm run verify — runs every verify-*.mjs (23
+  verify-all.mjs               npm run verify — runs every verify-*.mjs (24
                                suites); `npm run verify -- photos` runs one
   verify-*.mjs                 one suite per behaviour, no framework
 
@@ -973,6 +1011,7 @@ backend/
   sheet_names.go               what each sheet is called
   tasks.go                     the Tasks tab's project-wide reads
   comments.go, bookmarks.go    checking comments, counting them; starred sheets
+  reversals.go                 the trash, issue history and voiding an issue
   *_schema.sql                 applied at startup (schema.sql is the base)
   *_test.go                    integration tests against punchlist_test
 ```

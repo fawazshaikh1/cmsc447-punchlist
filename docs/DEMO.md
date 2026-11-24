@@ -69,6 +69,16 @@ proven.
 - ☆ beside the sheet picker stars the sheet. **Bookmarks** → type "a101": A-101
   opens, even on the other drawing; the starred sheet is one tap back.
 
+## 3d. Put an accident right (1 min)
+
+- Open a task that is *Ready for review* and set it back to **Open**: it asks
+  why. Type *Bracket still loose — re-anchor it*: the task's comments now say
+  "Sent back from Ready for review to Open: …".
+- Tick a test task and delete it. **Recently deleted** shows it with who
+  deleted it and when; **Restore** brings it back with the same number.
+- **Issue history**: every issued PDF. **Void issue** warns that sent copies
+  cannot be recalled and asks why; the issued tasks it alone locked unlock.
+
 ## 4. Bring in the subcontractor (2 min)
 
 - PM: account menu (top right) → **People on this project**. The sub must have
@@ -103,4 +113,4 @@ comes back `403` with the reason.
 | How are passwords stored? | PBKDF2-SHA256, 600,000 iterations, a random salt each. Sessions are HttpOnly cookies; the database holds only their digest. |
 | What stops a collaborator editing? | The server: every write is checked against the role on that project (`backend/access.go`). |
 | How do you add a markup type? | A new class, a marker component and an export writer, each registering itself — no existing file changes. See ARCHITECTURE.md. |
-| How is it tested? | 23 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |
+| How is it tested? | 24 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |
