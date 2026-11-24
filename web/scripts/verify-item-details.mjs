@@ -355,11 +355,11 @@ check('an ISSUED pin\'s details cannot be changed', async () => {
 // =========================================================================
 
 // Priority joined in the Tasks tab release (spec 6.3), after the four
-// assignment fields.
-check('the five fields are registered, in display order', () => {
+// assignment fields; the location check (D7, SCRUM-91) after that.
+check('the six fields are registered, in display order', () => {
   assert.deepEqual(
     ItemFieldRegistry.all().map((field) => field.getKey()),
-    [TRADE, COMPANY, ASSIGNEE, DUE, 'priority'],
+    [TRADE, COMPANY, ASSIGNEE, DUE, 'priority', 'locationCheck'],
   );
 });
 

@@ -44,9 +44,13 @@ export class PunchListEntry {
    *        as they come, so a new field reaches the schedule unedited.
    * @param {string} [fields.sheetName] The sheet's number, "A-101", where the
    *        drawing names its sheets (see domain/sheets). Empty prints "Sheet N".
+   * @param {string} [fields.itemId] Which item this line is, so what is kept
+   *        apart from the item — its attached photos (SCRUM-88) — can be found
+   *        for its detail page. Empty when a builder does not say.
    */
-  constructor({ number, pageIndex, description, status, statusKey, createdAt, details = [], sheetName = '' }) {
+  constructor({ number, pageIndex, description, status, statusKey, createdAt, details = [], sheetName = '', itemId = '' }) {
     this.number = number;
+    this.itemId = typeof itemId === 'string' ? itemId : '';
     this.pageIndex = pageIndex;
     this.sheetName = typeof sheetName === 'string' ? sheetName.trim() : '';
     // An empty description is the normal case for an item raised in a hurry and
@@ -88,6 +92,7 @@ export class PunchListEntry {
     return new PunchListEntry({
       number: this.number,
       pageIndex: this.pageIndex,
+      itemId: this.itemId,
       description: this.description,
       status: this.status,
       statusKey: this.statusKey,

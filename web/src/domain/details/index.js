@@ -4,6 +4,7 @@ import { ResponsibleCompanyField } from './fields/ResponsibleCompanyField';
 import { AssigneeField } from './fields/AssigneeField';
 import { DueDateField } from './fields/DueDateField';
 import { PriorityField } from './fields/PriorityField';
+import { LocationCheckField } from './fields/LocationCheckField';
 
 export { CalendarDate } from './CalendarDate';
 export { ItemField } from './ItemField';
@@ -11,7 +12,7 @@ export { TextItemField } from './TextItemField';
 export { DateItemField } from './DateItemField';
 export { ItemFieldRegistry } from './ItemFieldRegistry';
 export { ItemDetails } from './ItemDetails';
-export { TradeField, ResponsibleCompanyField, AssigneeField, DueDateField, PriorityField };
+export { TradeField, ResponsibleCompanyField, AssigneeField, DueDateField, PriorityField, LocationCheckField };
 
 /**
  * The fields a punch item carries, IN THE ORDER THE PANEL SHOWS THEM.
@@ -30,3 +31,6 @@ ItemFieldRegistry.register(new AssigneeField());
 ItemFieldRegistry.register(new DueDateField());
 // High, Medium or Low — read as Medium where none was chosen (spec 6.3).
 ItemFieldRegistry.register(new PriorityField());
+// "Sheet revised — verify location", set when an item carries forward to a
+// revised set and cleared when its place is confirmed (D7, SCRUM-91).
+ItemFieldRegistry.register(new LocationCheckField());

@@ -1,9 +1,10 @@
 import { MarkupFlagRegistry } from './MarkupFlagRegistry';
 import { OverdueFlag } from './OverdueFlag';
+import { RevisedSheetFlag } from './RevisedSheetFlag';
 
 export { MarkupFlag } from './MarkupFlag';
 export { MarkupFlagRegistry } from './MarkupFlagRegistry';
-export { OverdueFlag };
+export { OverdueFlag, RevisedSheetFlag };
 
 /**
  * The flags the sheet and the panel show, in the order the panel lists them.
@@ -13,3 +14,4 @@ export { OverdueFlag };
  * panel shows its sentence; neither file changes.
  */
 MarkupFlagRegistry.register(new OverdueFlag());
+MarkupFlagRegistry.register(new RevisedSheetFlag());
