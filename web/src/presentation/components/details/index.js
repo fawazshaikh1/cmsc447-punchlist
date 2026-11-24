@@ -1,4 +1,5 @@
 import { ChoiceFieldEditor } from './ChoiceFieldEditor';
+import { ConfirmFieldEditor } from './ConfirmFieldEditor';
 import { DateFieldEditor } from './DateFieldEditor';
 import { FieldEditorRegistry } from './FieldEditorRegistry';
 import { TextFieldEditor } from './TextFieldEditor';
@@ -17,3 +18,5 @@ FieldEditorRegistry.register('text', TextFieldEditor);
 FieldEditorRegistry.register('date', DateFieldEditor);
 // Priority's High / Medium / Low (spec 6.3).
 FieldEditorRegistry.register('choice', ChoiceFieldEditor);
+// "Sheet revised — verify location": a button, not an input (D7, SCRUM-91).
+FieldEditorRegistry.register('confirm', ConfirmFieldEditor);

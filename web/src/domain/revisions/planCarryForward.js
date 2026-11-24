@@ -20,10 +20,15 @@ import { PunchListRegistry } from '../punchlist/PunchListRegistry';
  * its place (LocationCheckField, RevisedSheetFlag).
  *
  * Only open items move (Open and Ready for review). A closed item is part of
- * the record of the set it was closed on, and stays there. Markups that are
- * not items — clouds, arrows, notes about the old drawing — stay too. An open
- * item whose sheet has no number, or whose number is not in the revision, is
- * left where it is and listed with the reason, never dropped silently.
+ * the record of the set it was closed on, and stays there. An issued item
+ * stays too, open or not: an issue seals what it printed, and the sealed
+ * markups are the record of what went out on THAT set (SCRUM-38) — moving one
+ * would change an issued document after the fact. The caller passes the
+ * project's sealed ids, because the editor's own policy only knows the seals
+ * of the sheet that is open. Markups that are not items — clouds, arrows,
+ * notes about the old drawing — stay as well. An open item that is issued,
+ * whose sheet has no number, or whose number is not in the revision, is left
+ * where it is and listed with the reason, never dropped silently.
  *
  * Pure, so it is checked in Node (verify-revisions).
  *
@@ -35,9 +40,10 @@ import { PunchListRegistry } from '../punchlist/PunchListRegistry';
  * @param {import('../sheets/SheetName').SheetName[]} request.fromSheets
  * @param {import('../sheets/SheetName').SheetName[]} request.toSheets
  * @param {(documentName: string, pageIndex: number) => string} request.sheetIdFor
+ * @param {Set<string>} [request.sealedIds] Ids of markups sealed by an issue.
  * @returns {{ moves: CarryMove[], left: LeftBehind[] }}
  */
-export function planCarryForward({ items, fromDocument, toDocument, fromSheets, toSheets, sheetIdFor }) {
+export function planCarryForward({ items, fromDocument, toDocument, fromSheets, toSheets, sheetIdFor, sealedIds = new Set() }) {
   const kinds = new Set(PunchListRegistry.registeredKinds());
   const numberOnPage = new Map(fromSheets.map((sheet) => [sheet.pageIndex, sheet.number]));
   const pageForNumber = new Map();
@@ -52,6 +58,10 @@ export function planCarryForward({ items, fromDocument, toDocument, fromSheets, 
     if (!kinds.has(annotation.getKind())) continue;
     if (documentNameOf(annotation.sheetId) !== fromDocument) continue;
     if (annotation.status === PinStatus.CLOSED) continue;
+    if (sealedIds.has(annotation.id)) {
+      left.push({ annotation, reason: 'Issued items stay with the set they were issued on; void the issue to move them.' });
+      continue;
+    }
 
     const number = numberOnPage.get(pageIndexOf(annotation.sheetId)) ?? '';
     if (!squash(number)) {

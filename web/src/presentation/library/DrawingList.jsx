@@ -28,8 +28,11 @@ const ADDED = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'short
  * @param {unknown} [props.version] Changes when the library is known to have changed.
  * @param {() => void} [props.onChanged] Called after a drawing is removed here.
  * @param {string|null} [props.openName] The drawing on screen, marked in the list.
+ * @param {(drawing: import('../../domain/library').LibraryDrawing, drawings: import('../../domain/library').LibraryDrawing[]) => React.ReactNode} [props.rowExtras]
+ *        More on each row, after the drawing — its revision and Upload
+ *        revision (SCRUM-90). A slot, so this list needs no edit for the next.
  */
-export function DrawingList({ onOpen, version, onChanged, openName = null }) {
+export function DrawingList({ onOpen, version, onChanged, openName = null, rowExtras }) {
   const { library } = useServices();
   const { project } = useSession();
   const { ask, dialog } = useConfirmation();
@@ -142,6 +145,7 @@ export function DrawingList({ onOpen, version, onChanged, openName = null }) {
                   </span>
                   {isOpen && <span className="drawing-current small">Open</span>}
                 </button>
+                {rowExtras?.(drawing, drawings)}
                 {manage && (
                   <button
                     type="button"

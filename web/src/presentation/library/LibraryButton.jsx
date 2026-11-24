@@ -20,9 +20,10 @@ import { DrawingList } from './DrawingList';
  * @param {(drawing: import('../../domain/library').LibraryDrawing) => void} props.onOpen
  * @param {unknown} [props.version] See DrawingList.
  * @param {() => void} [props.onChanged] See DrawingList.
+ * @param {Function} [props.rowExtras] See DrawingList.
  * @param {string|null} [props.openName] The drawing on screen.
  */
-export function LibraryButton({ onOpen, version, onChanged, openName }) {
+export function LibraryButton({ onOpen, version, onChanged, openName, rowExtras }) {
   const { library } = useServices();
   const { project } = useSession();
   const [open, setOpen] = useState(false);
@@ -51,6 +52,7 @@ export function LibraryButton({ onOpen, version, onChanged, openName }) {
             version={version}
             onChanged={onChanged}
             openName={openName}
+            rowExtras={rowExtras}
           />,
           document.body,
         )}
@@ -58,7 +60,7 @@ export function LibraryButton({ onOpen, version, onChanged, openName }) {
   );
 }
 
-function LibraryDialog({ onClose, onOpen, version, onChanged, openName }) {
+function LibraryDialog({ onClose, onOpen, version, onChanged, openName, rowExtras }) {
   const backdrop = useBackdropDismiss(onClose);
   const titleId = useId();
 
@@ -85,7 +87,7 @@ function LibraryDialog({ onClose, onOpen, version, onChanged, openName }) {
             <Icon name="close" size={18} />
           </button>
         </div>
-        <DrawingList onOpen={onOpen} version={version} onChanged={onChanged} openName={openName} />
+        <DrawingList onOpen={onOpen} version={version} onChanged={onChanged} openName={openName} rowExtras={rowExtras} />
       </div>
     </div>
   );

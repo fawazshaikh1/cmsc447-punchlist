@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { usePinchZoom } from '../gestures/usePinchZoom';
 import { CommentsSection } from '../comments/CommentsSection';
+import { ItemPhotosSection } from '../itemphotos/ItemPhotosSection';
 import { PunchListPanel } from '../punchlist/PunchListPanel';
 import { useEarlierSheets } from '../punchlist/useEarlierSheets';
 
@@ -393,6 +394,7 @@ export function SheetViewer({
               peers={editor.annotations}
             >
               {/* The conversation about this item (spec 7.1). */}
+              <ItemPhotosSection annotation={editor.selected} />
               <CommentsSection annotation={editor.selected} />
             </PropertiesPanel>
           ) : (

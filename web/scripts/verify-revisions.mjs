@@ -11,7 +11,9 @@
  * 2. ITEMS BELONG TO A SHEET NUMBER, NOT A PAGE: an open item on A-101 moves to
  *    whichever page of the revision is A-101 — same id, fields and history —
  *    and is flagged to have its place checked. Closed items stay with the set
- *    they were closed on. An open item that cannot move is listed, with why.
+ *    they were closed on, and issued items with the set they were issued on:
+ *    an issued markup never moves. An open item that cannot move is listed,
+ *    with why.
  * 3. THE FLAG IS STORED ON THE ITEM, so it survives a reload and is cleared by
  *    an ordinary edit ("Confirm the location of pin").
  * 4. THE ADAPTER speaks the server's language.
@@ -120,6 +122,19 @@ check('an open item that cannot move is left where it is, with the reason', () =
   assert.deepEqual(left.map(({ annotation, reason }) => [annotation.id, reason]), [
     ['d', 'A-104 is not in the revised set.'],
     ['e', 'Its sheet has no number to match.'],
+  ]);
+});
+
+check('an issued item stays with the set it was issued on, and says so', () => {
+  const issued = pin('h', 0);
+  const free = pin('i', 0);
+  const { moves, left } = planCarryForward({
+    items: [issued, free], fromDocument: OLD, toDocument: NEW, fromSheets: oldSheets, toSheets: newSheets, sheetIdFor,
+    sealedIds: new Set(['h']),
+  });
+  assert.deepEqual(moves.map(({ next }) => next.id), ['i']);
+  assert.deepEqual(left.map(({ annotation, reason }) => [annotation.id, reason]), [
+    ['h', 'Issued items stay with the set they were issued on; void the issue to move them.'],
   ]);
 });
 

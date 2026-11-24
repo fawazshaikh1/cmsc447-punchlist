@@ -1,0 +1,82 @@
+/* =========================================================================
+   REVISIONS — see presentation/revisions
+   ========================================================================= */
+
+.revision-controls {
+  display: inline-flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.revision-badge {
+  padding: 2px 8px;
+  border: 1px solid var(--ink-600);
+  border-radius: var(--radius-sm);
+  color: var(--ink-200);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.revision-badge.is-superseded {
+  border-style: dashed;
+  color: var(--ink-300);
+}
+
+/* Icon and words on one line: .icon-button alone stacks them. */
+.icon-button.revision-upload {
+  position: relative;
+  display: inline-flex;
+  padding: 0 10px;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.revision-upload-label {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.revision-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.revision-error {
+  flex-basis: 100%;
+}
+
+.carry-forward {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+/* The words take the room; the buttons sit beside them when they fit. A bare
+   text node here would be its own full-width item, leaving the icon alone. */
+.carry-forward-text {
+  flex: 1 1 20rem;
+}
+
+.carry-forward-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+/* On a phone the upload button keeps its icon and gives up the words. */
+@media (max-width: 560px) {
+  .revision-upload-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
