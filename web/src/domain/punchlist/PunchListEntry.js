@@ -1,3 +1,5 @@
+import { CalendarDate } from '../details/CalendarDate';
+
 /**
  * One line of the punch list: a markup, reduced to what a schedule needs.
  *
@@ -95,10 +97,16 @@ export class PunchListEntry {
     });
   }
 
-  /** ISO date, no time. A punch list is a day-resolution document. */
+  /**
+   * ISO date, no time. A punch list is a day-resolution document.
+   *
+   * The day where the item was raised, not in UTC: `toISOString` gave the UTC
+   * day, so anything raised after 7 pm in Maryland printed as tomorrow
+   * (SCRUM-82).
+   */
   get raisedOn() {
     return this.createdAt instanceof Date && !Number.isNaN(this.createdAt.valueOf())
-      ? this.createdAt.toISOString().slice(0, 10)
+      ? CalendarDate.fromLocalDate(this.createdAt).toString()
       : '';
   }
 

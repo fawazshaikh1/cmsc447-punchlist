@@ -190,34 +190,51 @@ export class ExportService {
    * to be right at the moment of asking, and a stale one here would understate
    * what the user is about to freeze.
    *
+   * Only what is NOT locked yet is counted: a markup an earlier issue locked
+   * stays locked whatever happens now, so it is not part of what this issue
+   * makes permanent. Counted with it, a re-issue that locked three new markups
+   * warned that 21 would become permanent (SCRUM-83). The already-locked ones
+   * are reported apart, so the question can say what it is leaving alone.
+   *
    * @param {object} request
    * @param {number} request.pageCount
    * @param {(pageIndex: number) => string} request.sheetIdFor
-   * @returns {Promise<{ annotationCount: number, sheetCount: number, incompleteCount: number }>}
+   * @param {string} [request.documentName] The drawing set, which is how its
+   *        earlier issues are found. Without it nothing counts as locked.
+   * @returns {Promise<{ annotationCount: number, sheetCount: number, incompleteCount: number, alreadyLockedCount: number }>}
    */
-  async summarize({ pageCount, sheetIdFor }) {
+  async summarize({ pageCount, sheetIdFor, documentName }) {
     let annotationCount = 0;
     let sheetCount = 0;
     let incompleteCount = 0;
+    let alreadyLockedCount = 0;
 
     for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
-      const annotations = await this.annotations.listForSheet(sheetIdFor(pageIndex));
+      const sheetId = sheetIdFor(pageIndex);
+      const annotations = await this.annotations.listForSheet(sheetId);
       if (annotations.length === 0) continue;
 
+      const locked = documentName ? new Set(await this.exportHistory.sealedIdsForSheet(documentName, sheetId)) : new Set();
+      const unlocked = annotations.filter((annotation) => !locked.has(annotation.id));
+      alreadyLockedCount += annotations.length - unlocked.length;
+      if (unlocked.length === 0) continue;
+
       sheetCount += 1;
-      annotationCount += annotations.length;
+      annotationCount += unlocked.length;
 
       // Counted across the WHOLE set, not just the sheet on screen. A pin with
       // no description three sheets away is precisely the one that gets issued
       // by accident, because nobody is looking at it. New pins cannot be
       // incomplete, so in practice this catches work placed before the rule
-      // existed — which is the work most likely to have been forgotten.
-      incompleteCount += annotations.filter(
+      // existed — which is the work most likely to have been forgotten. Only
+      // unlocked ones: a locked pin can no longer be filled in, so warning
+      // about it would ask for something impossible.
+      incompleteCount += unlocked.filter(
         (annotation) => !AnnotationRuleRegistry.isComplete(annotation),
       ).length;
     }
 
-    return { annotationCount, sheetCount, incompleteCount };
+    return { annotationCount, sheetCount, incompleteCount, alreadyLockedCount };
   }
 
   /**

@@ -43,6 +43,12 @@ import { PdfPoint } from '../src/domain/geometry/PdfPoint.js';
 import { PunchListRegistry, PunchListEntry, assignOrdinals } from '../src/domain/punchlist/index.js';
 import { FlattenedSheetExporter } from '../src/infrastructure/export/FlattenedSheetExporter.js';
 import { PunchListPageWriter } from '../src/infrastructure/export/PunchListPageWriter.js';
+import { PdfLibSheetExporter } from '../src/infrastructure/export/PdfLibSheetExporter.js';
+
+// Printed dates are checked in Maryland, where the UTC day ends at 7 or 8 pm —
+// the hours an evening walk-through is issued, and when SCRUM-82 showed. Set
+// before any check runs; each suite is its own process, so no other suite sees it.
+process.env.TZ = 'America/New_York';
 
 // --- fixtures ---------------------------------------------------------------
 
@@ -345,6 +351,35 @@ check('a new markup type joins the schedule by registering, not by editing', asy
   const doc = await PDFDocument.create();
   doc.addPage([612, 792]);
   assert.equal(await writer.append(doc, entries), 1);
+});
+
+check('SCRUM-82: an evening issue prints its own day, not the next day in UTC', async () => {
+  // 9:30 pm on 17 November in Maryland is already 18 November in UTC.
+  const evening = new Date(2026, 10, 17, 21, 30);
+  const late = new Pin('late', SHEET, new PdfPoint(300, 400), 'Grout cracked at threshold', PinStatus.OPEN, evening);
+
+  // The schedule: the day it was raised, and the day the PDF was issued.
+  const entries = PunchListRegistry.collect([{ pageIndex: 0, annotations: [late] }]);
+  assert.equal(entries[0].raisedOn, '2026-11-17');
+  const doc = await PDFDocument.create();
+  doc.addPage([612, 792]);
+  await new PunchListPageWriter().append(doc, entries, { documentName: 'drawing.pdf', issuedBy: 'Verifier', issuedAt: evening });
+  const schedule = await textIn(await doc.save());
+  assert.match(schedule, /Issued 2026-11-17/);
+  assert.doesNotMatch(schedule, /2026-11-18/, 'no date on the schedule is the UTC day');
+
+  // The pin's note in a working copy says the same day.
+  const bytes = await new PdfLibSheetExporter().exportAnnotated({
+    sourceBytes: await blankSheet(),
+    pages: [{ pageIndex: 0, annotations: [late] }],
+    author: 'Verifier',
+  });
+  const loaded = await PDFDocument.load(bytes);
+  const annots = loaded.getPage(0).node.lookupMaybe(PDFName.of('Annots'), PDFArray);
+  const notes = Array.from({ length: annots.size() }, (_, i) =>
+    loaded.context.lookup(annots.get(i)).get(PDFName.of('Contents'))?.decodeText?.() ?? '',
+  ).join('\n');
+  assert.match(notes, /Created 2026-11-17/);
 });
 
 // --- runner -----------------------------------------------------------------

@@ -56,8 +56,10 @@ export function ClosingNotice() {
  * @param {number} props.sheetCount
  * @param {number} [props.incompleteCount] Markups still missing something —
  *        almost always a pin placed before descriptions were required.
+ * @param {number} [props.alreadyLockedCount] Markups an earlier issue locked.
+ *        Not in `annotationCount`: this issue does not change them.
  */
-export function FlattenExportNotice({ annotationCount, sheetCount, incompleteCount = 0 }) {
+export function FlattenExportNotice({ annotationCount, sheetCount, incompleteCount = 0, alreadyLockedCount = 0 }) {
   return (
     <>
       {/* Shown FIRST, above the explanation of permanence, because it is the
@@ -91,6 +93,10 @@ export function FlattenExportNotice({ annotationCount, sheetCount, incompleteCou
         Once issued they cannot be moved, edited, reopened or deleted — because
         the file you are handing over cannot be changed either, and the two must
         not disagree.
+        {alreadyLockedCount > 0 &&
+          ` ${alreadyLockedCount} more ${alreadyLockedCount === 1 ? 'was' : 'were'} locked by an earlier issue and ${
+            alreadyLockedCount === 1 ? 'is' : 'are'
+          } issued again as ${alreadyLockedCount === 1 ? 'it is' : 'they are'}.`}
       </p>
       <p>
         You can keep working on the drawing afterwards by adding new markups.

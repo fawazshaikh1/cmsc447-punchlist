@@ -234,8 +234,9 @@ export default function App() {
       return;
     }
 
-    const { annotationCount, sheetCount, incompleteCount } =
-      await exportsFlattened.summarize({ pageCount, sheetIdFor });
+    // Only what is not locked yet: an earlier issue's markups stay as they are.
+    const { annotationCount, sheetCount, incompleteCount, alreadyLockedCount } =
+      await exportsFlattened.summarize({ pageCount, sheetIdFor, documentName });
 
     // None of OUR markups means nothing of ours gets sealed — but the file may
     // still be covered in markups from a previous export, and flattening those
@@ -256,6 +257,7 @@ export default function App() {
           annotationCount={annotationCount}
           sheetCount={sheetCount}
           incompleteCount={incompleteCount}
+          alreadyLockedCount={alreadyLockedCount}
         />
       ),
       confirmLabel: `Issue and lock ${annotationCount} markup(s)`,
@@ -264,7 +266,7 @@ export default function App() {
     });
 
     if (confirmed) runExport(true);
-  }, [exportsFlattened, pageCount, sheetIdFor, ask, runExport]);
+  }, [exportsFlattened, pageCount, sheetIdFor, documentName, ask, runExport]);
 
   /**
    * The click handler proper.

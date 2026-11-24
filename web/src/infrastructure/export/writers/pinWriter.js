@@ -1,4 +1,5 @@
 import { PIN_KIND, PinStatus } from '../../../domain/annotations';
+import { CalendarDate } from '../../../domain/details/CalendarDate';
 import { PdfWriterRegistry } from '../PdfWriterRegistry';
 import { appendAnnotation, createAppearance, markupFields, num, DEFAULT_FONT_NAME } from '../pdfPrimitives';
 import { pinLabelOps } from './pinLabelOps';
@@ -153,7 +154,8 @@ PdfWriterRegistry.register(PIN_KIND, (pin, { pdfDoc, page, author, font, index, 
       contents: [
         `Punch item ${label} — ${pin.status.replace(/_/g, ' ')}`,
         pin.label || '(no description)',
-        `Created ${pin.createdAt.toISOString().slice(0, 10)}`,
+        // The local day, as on the schedule — not the UTC one (SCRUM-82).
+        `Created ${CalendarDate.fromLocalDate(pin.createdAt)}`,
       ].join('\n'),
     }),
     AP: { N: createAppearance(pdfDoc, rect, ops.join('\n'), { Font: { [DEFAULT_FONT_NAME]: font.ref } }) },
