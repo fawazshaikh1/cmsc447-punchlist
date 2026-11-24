@@ -63,6 +63,37 @@ export class ChangeRecord {
     return `${this.actor.toString()} ${VERBS[this.intent] ?? 'changed'} it`;
   }
 
+  /**
+   * The line an item's history shows — who did what, as one sentence:
+   * `J. Rivera (Apex Electrical) edited it — set the trade`.
+   *
+   * `detail` is the label the undo button showed, and Undo finishes a label
+   * with the item: "Undo: Set trade of pin". Printed bare after `describe()`
+   * it stops mid-phrase ("edited it — Set trade of") or says the verb twice
+   * ("added it — Added"). Here the item is already "it", so:
+   *
+   *   - a label that only names the action again ('Added', 'Move') is left off;
+   *   - one that ends in "of" names the part of the item that changed, and
+   *     reads "set the trade", "confirm the location";
+   *   - any other carries on the sentence as written ("undid move pin").
+   *
+   * Worded on reading, not on writing, so history already stored reads the
+   * same way. A comment's detail is its text, which the thread shows instead.
+   */
+  describeWithDetail() {
+    const said = this.describe();
+    const label = this.intent !== 'comment' && typeof this.detail === 'string' ? this.detail.trim() : '';
+    if (!label) return said;
+
+    const named = label.split(' ')[0].toLowerCase();
+    const [action] = (VERBS[this.intent] ?? 'changed').split(' ');
+    if ([named, `${named}d`, `${named}ed`].includes(action)) return said;
+
+    const partOf = label.match(PART_OF);
+    const phrase = partOf ? `${partOf[1]} the ${partOf[2]}` : label;
+    return `${said} — ${lowerFirst(phrase)}`;
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -98,3 +129,8 @@ const VERBS = Object.freeze({
   status: 'changed the status of',
   comment: 'commented on',
 });
+
+/** "Set trade of", "Confirm the location of": a verb, then the part of the item it changed. */
+const PART_OF = /^(\S+) (?:(?:the|a|an) )?(.+) of$/i;
+
+const lowerFirst = (text) => text.charAt(0).toLowerCase() + text.slice(1);
