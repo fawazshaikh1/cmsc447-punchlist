@@ -431,7 +431,7 @@ const STATUS_COLORS = {
   closed: rgb(0.12, 0.62, 0.3),
 };
 
-function statusColor(key) {
+export function statusColor(key) {
   return STATUS_COLORS[key] ?? INK;
 }
 
@@ -510,7 +510,7 @@ function paginate(rows, layout) {
  * mid-word rather than allowed to overflow, since there is no legal wrap point
  * in it and overflowing would silently lose the tail.
  */
-function wrap(value, maxWidth, size, font) {
+export function wrap(value, maxWidth, size, font) {
   // Sanitized ONCE, here, so every downstream measurement and every drawn line
   // is the same string. An earlier version sanitized inside the measurement and
   // drew the raw text, which measured one string and printed another — the kind
@@ -563,7 +563,7 @@ function wrap(value, maxWidth, size, font) {
  * spec — or a name with an accent — would fail the whole export rather than the
  * one glyph. A description is user input, so this is not a theoretical case.
  */
-function sanitize(value) {
+export function sanitize(value) {
   return String(value)
     .replace(/[‘’]/g, "'")
     .replace(/[“”]/g, '"')

@@ -26,6 +26,11 @@ import { BookmarkStar } from './presentation/bookmarks/BookmarkStar';
 import { BookmarksMenu } from './presentation/bookmarks/BookmarksMenu';
 import { useSendBack } from './presentation/reversals/useSendBack';
 import { ReversalsTools } from './presentation/reversals/ReversalsTools';
+import { ItemPhotosSection } from './presentation/itemphotos/ItemPhotosSection';
+import { useRevisionLinks } from './presentation/revisions/useRevisionLinks';
+import { RevisionControls } from './presentation/revisions/RevisionControls';
+import { useCarryForward } from './presentation/revisions/useCarryForward';
+import { CarryForwardBanner } from './presentation/revisions/CarryForwardBanner';
 import { documentNameOf } from './domain/documents/sheetNames';
 import { PIN_KIND } from './domain/annotations';
 import { ToolRegistry } from './domain/tools';
@@ -152,6 +157,35 @@ export default function App() {
   const [target, setTarget] = useState(null);
   const requested = useRef(null);
   const { openFromLibrary } = library;
+
+  // A drawing's revisions on each row of the Drawings list (SCRUM-90). An
+  // uploaded revision opens at once, so its sheet numbers are read and the
+  // previous set's open items can carry forward (SCRUM-91).
+  const revisionLinks = useRevisionLinks(library.version);
+  const { changed: libraryChanged } = library;
+  const { reload: reloadRevisions } = revisionLinks;
+  const rowExtras = useCallback(
+    (drawing, drawings) => (
+      <RevisionControls
+        drawing={drawing}
+        drawings={drawings}
+        links={revisionLinks.links}
+        onUploaded={(added) => {
+          reloadRevisions();
+          libraryChanged();
+          void openFromLibrary(added);
+        }}
+      />
+    ),
+    [revisionLinks.links, reloadRevisions, libraryChanged, openFromLibrary],
+  );
+  const carry = useCarryForward({
+    documentName: page ? documentName : null,
+    namedSheets: sheetNames.namedSheets,
+    version: library.version,
+    // The sheet on screen re-reads, so the items that arrived appear on it.
+    onCarried: () => void openPage(pageIndex),
+  });
   const goTo = useCallback((next) => {
     requested.current = null;
     setTarget(next);
@@ -334,12 +368,14 @@ export default function App() {
           version={library.version}
           onChanged={library.changed}
           openName={documentName}
+          rowExtras={rowExtras}
         />
         <SessionMenu />
       </Toolbar>
 
-      {(error || exportError || exportPrecheckError || exportMessage || library.busy || library.notice || library.error) && (
+      {(error || exportError || exportPrecheckError || exportMessage || library.busy || library.notice || library.error || carry.visible) && (
         <div className="banner-row">
+          <CarryForwardBanner carry={carry} documentName={documentName} />
           {library.busy && (
             <p className="notice" role="status">
               <Icon name="upload" size={18} /> {library.busy}
@@ -380,7 +416,12 @@ export default function App() {
           openSheet={page && documentName ? { documentName, pageIndex } : null}
           onOpenOnSheet={goTo}
           // The conversation about the open task, as on its sheet (spec 7.1).
-          renderTaskExtras={(row, onChanged) => <CommentsSection annotation={row.annotation} onPosted={onChanged} />}
+          renderTaskExtras={(row, onChanged) => (
+            <>
+              <ItemPhotosSection annotation={row.annotation} onChanged={onChanged} />
+              <CommentsSection annotation={row.annotation} onPosted={onChanged} />
+            </>
+          )}
           // Putting accidents right, for admins (spec 8.2, 8.3).
           renderAdminTools={(onChanged) => <ReversalsTools sheetLabelFor={labelOf} onChanged={onChanged} />}
           gate={sendBack.gate}
@@ -421,6 +462,7 @@ export default function App() {
                 onOpen={(drawing) => void library.openFromLibrary(drawing)}
                 version={library.version}
                 onChanged={library.changed}
+                rowExtras={rowExtras}
               />
               <ol className="empty-steps">
                 <li>Pick a tool from the left, then tap the drawing to place a markup.</li>

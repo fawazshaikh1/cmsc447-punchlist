@@ -29,6 +29,7 @@ const itemEntry = (item, { number, pageIndex }) =>
   new PunchListEntry({
     number,
     pageIndex,
+    itemId: item.id,
     description: item.label,
     status: statusLabel(item.status),
     statusKey: item.status,

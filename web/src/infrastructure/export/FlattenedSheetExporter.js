@@ -4,6 +4,7 @@ import { SheetExporter } from '../../domain/ports/SheetExporter';
 import { PunchListRegistry, assignOrdinals } from '../../domain/punchlist';
 import { PdfWriterRegistry } from './PdfWriterRegistry';
 import { PunchListPageWriter } from './PunchListPageWriter';
+import { SheetScope } from '../../domain/projects/SheetScope';
 import { ensureDefaultFontResource } from './pdfPrimitives';
 import './writers';
 
@@ -65,11 +66,16 @@ export class FlattenedSheetExporter extends SheetExporter {
    *        Appends the schedule of punch items. On by default, because
    *        flattening is precisely what destroys the descriptions — see
    *        PunchListPageWriter. Pass `null` for a plan-only PDF.
+   * @param {{ append: (pdfDoc: object, entries: object[], context: object) => Promise<number> }[]} [options.reports]
+   *        Every report appended after the drawing, in order — the schedule,
+   *        then each item's detail page (SCRUM-88). A slot, so the next kind
+   *        of report page is a new writer in the composition root rather than
+   *        an edit here. Given, it replaces `punchList`.
    */
-  constructor({ media = null, punchList = new PunchListPageWriter() } = {}) {
+  constructor({ media = null, punchList = new PunchListPageWriter(), reports } = {}) {
     super();
     this.media = media;
-    this.punchList = punchList;
+    this.reports = reports ?? (punchList ? [punchList] : []);
   }
 
   /**
@@ -218,10 +224,15 @@ export class FlattenedSheetExporter extends SheetExporter {
     // AFTER pass 2, deliberately. The schedule pages carry no annotations, so
     // flattening would skip them anyway, but appending last also keeps the
     // numbering above from depending on pages that did not exist when it ran.
-    await this.punchList?.append(pdfDoc, PunchListRegistry.collect(pages, ordinals), {
+    const entries = PunchListRegistry.collect(pages, ordinals);
+    const context = {
       documentName,
       issuedBy: author,
-    });
+      loadMedia: (key) => this.media?.get(key) ?? Promise.resolve(null),
+      // Whose item photos the detail pages read — the project is in every sheet id.
+      projectId: SheetScope.projectOf(pages.find((page) => page.annotations.length > 0)?.annotations[0]?.sheetId ?? ''),
+    };
+    for (const report of this.reports) await report.append(pdfDoc, entries, context);
 
     // ======================================================================
     // WHY THIS RETURNS AN OBJECT WHERE THE CONTRACT SAYS Uint8Array

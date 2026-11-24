@@ -24,7 +24,7 @@ import { IndexedDbMediaStore } from '../infrastructure/media/IndexedDbMediaStore
 import { HttpMediaStore } from '../infrastructure/media/HttpMediaStore';
 import { CanvasImageProcessor } from '../infrastructure/media/CanvasImageProcessor';
 import { MediaUrlCache } from './media/MediaUrlCache';
-import { PdfLibSheetExporter, FlattenedSheetExporter } from '../infrastructure/export';
+import { PdfLibSheetExporter, FlattenedSheetExporter, PunchListPageWriter, PunchListDetailWriter } from '../infrastructure/export';
 import { PdfLibWorkingCopyReader } from '../infrastructure/workingcopy/PdfLibWorkingCopyReader';
 import { LocalStorageAnnotationRepository } from '../infrastructure/persistence/LocalStorageAnnotationRepository';
 import { LocalStorageChangeLogRepository } from '../infrastructure/persistence/LocalStorageChangeLogRepository';
@@ -45,6 +45,8 @@ import { HttpCommentRepository } from '../infrastructure/comments/HttpCommentRep
 import { HttpBookmarkRepository } from '../infrastructure/bookmarks/HttpBookmarkRepository';
 import { HttpTrashRepository } from '../infrastructure/reversals/HttpTrashRepository';
 import { HttpIssueRepository } from '../infrastructure/reversals/HttpIssueRepository';
+import { HttpItemPhotoRepository } from '../infrastructure/itemphotos/HttpItemPhotoRepository';
+import { HttpRevisionRepository } from '../infrastructure/revisions/HttpRevisionRepository';
 
 /**
  * ===========================================================================
@@ -155,6 +157,9 @@ export function ServiceContainer({
           )
         : new IndexedDbMediaStore());
     const imageProcessor = new CanvasImageProcessor();
+    // Photos attached to punch items (SCRUM-88): in the panels, and on each
+    // item's page in the issued PDF. Server mode only.
+    const itemPhotos = api ? new HttpItemPhotoRepository(api) : null;
 
     // Object URLs, created once per photo and revoked together. Held here
     // rather than per component so the same photo on the sheet and in the
@@ -223,6 +228,9 @@ export function ServiceContainer({
       // What admins can put right (spec 8): deleted markups, and voiding an issue.
       trash: api ? new HttpTrashRepository(api) : null,
       issues: api ? new HttpIssueRepository(api) : null,
+      itemPhotos,
+      // Which drawing replaces which (SCRUM-90).
+      revisions: api ? new HttpRevisionRepository(api) : null,
       // Both read directly by the editor hook. Exposed because they are domain
       // ports — the presentation layer depending on them is the dependency rule
       // working, not a leak.
@@ -258,7 +266,8 @@ export function ServiceContainer({
       ),
       exportsFlattened: new ExportService(
         annotations,
-        new FlattenedSheetExporter({ media }),
+        // The schedule, then a page per item with its photos (SCRUM-88).
+        new FlattenedSheetExporter({ media, reports: [new PunchListPageWriter(), new PunchListDetailWriter({ itemPhotos })] }),
         exports_,
         ids,
         { identity: who },

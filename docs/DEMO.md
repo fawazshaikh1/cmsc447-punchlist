@@ -89,11 +89,28 @@ proven.
   Issue PDF and Clear sheet are gone; dragging a pin does nothing.
 - Sub adds a photo. PM clicks back into their window: it appears — the sheet
   re-reads when you return to it.
+- Sub selects one of their items → **Add photo** under its details. The photo
+  is the item's own: it follows the item, and it is on the item's page when
+  the drawing is issued. The sub can remove their own photos, not the PM's.
 - Sub: Punch list → **Assigned to me** shows just their items.
 
 *Point to make:* the hiding is a courtesy. The server checks the role on every
 request — in DevTools, a collaborator's direct `PUT` to `/api/annotations/…`
 comes back `403` with the reason.
+
+## 4b. A revised set arrives — the PM (1 min)
+
+- **Drawings** → **Upload revision** on the set's row → the revised PDF (for
+  the demo, the same file will do). It is saved as *sample-drawing-set (rev
+  2).pdf* and opens; the list marks it **Rev 2** and the old set
+  **Superseded**.
+- A banner offers to carry the open items forward to the sheets with the same
+  numbers. **Carry forward**: each arrives at the same spot, with its photos
+  and comments, flagged *Sheet revised — check this item is still in the
+  right place*. Look at one and press **Confirm location**. One **Undo** would
+  have put them all back.
+- Closed items, and any already issued, stay with the old set; the banner says
+  which, and why.
 
 ## 5. Issue the drawing — the PM (2 min)
 
@@ -101,7 +118,8 @@ comes back `403` with the reason.
   that file here: the markups come back live, as the same items — not copies.
 - **Issue PDF** → the confirmation counts what will be locked → issue. Open
   the PDF: markups painted in, a punch list page appended with each item's sheet
-  number, trade, company and due date, issued by the PM by name.
+  number, trade, company and due date, issued by the PM by name — then a page
+  for each item, with its photos and who took them.
 - Back in the app, the issued items are read-only, with the reason, and undo
   cannot reach behind the issue.
 
@@ -113,4 +131,4 @@ comes back `403` with the reason.
 | How are passwords stored? | PBKDF2-SHA256, 600,000 iterations, a random salt each. Sessions are HttpOnly cookies; the database holds only their digest. |
 | What stops a collaborator editing? | The server: every write is checked against the role on that project (`backend/access.go`). |
 | How do you add a markup type? | A new class, a marker component and an export writer, each registering itself — no existing file changes. See ARCHITECTURE.md. |
-| How is it tested? | 24 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |
+| How is it tested? | 26 domain suites (`npm run verify`), Go integration tests against a real Postgres, and both on every pull request in GitHub Actions. |

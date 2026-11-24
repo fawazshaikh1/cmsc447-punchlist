@@ -1,0 +1,67 @@
+/* =========================================================================
+   PHOTOS ON AN ITEM — see presentation/itemphotos
+   ========================================================================= */
+
+.item-photos {
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--ink-650);
+}
+
+.item-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item-photo {
+  position: relative;
+  display: grid;
+  gap: 2px;
+}
+
+.item-photo img,
+.item-photo-missing {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border: 1px solid var(--ink-650);
+  border-radius: var(--radius-sm);
+  background: var(--ink-700);
+  color: var(--ink-300);
+  font-size: 12px;
+}
+
+.item-photo-credit {
+  overflow: hidden;
+  color: var(--ink-300);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A tap target on the photo's corner, not a speck. */
+.item-photo-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(15, 21, 27, 0.7);
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.item-photo-add {
+  justify-self: start;
+}
