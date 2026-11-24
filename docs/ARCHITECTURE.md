@@ -881,6 +881,49 @@ Spec 8: putting accidents right, by the people allowed to, with a record.
 
 `npm run verify -- reversals` and `go test` (`reversals_test.go`).
 
+## Photos on an item, revisions, carrying items forward
+
+SCRUM-88, 90 and 91: an item's own photos and its page in the issued PDF; a
+drawing's next revision; and moving open items onto it.
+
+| Piece | What it does |
+|---|---|
+| `domain/itemphotos/ItemPhoto` | a photo attached to an item: the `MediaRef`, a caption, who added it and when |
+| `infrastructure/export/PunchListDetailWriter` | one page per item after the schedule: number, sheet, status, description, details, then its photos two to a row with who added them, and "(continued)" pages when they run over |
+| `domain/revisions` | `RevisionLink`; `describeRevisions` (which set is current, what each replaced); `revisionNameFor` ("Set (rev 2).pdf" when the name is taken); `planCarryForward` |
+| `domain/details/fields/LocationCheckField`, `domain/flags/RevisedSheetFlag` | the "check its place" flag: an item field holding the set the item came from, and the flag that reads it |
+| `domain/ports/ItemPhotoRepository`, `RevisionRepository` | `HttpItemPhotoRepository`, `HttpRevisionRepository` |
+| `backend/item_photos.go`, `backend/revisions.go` | `item_photos` and `document_revisions`; an item's photos, the project's photos by item, add and remove; the project's revisions, and marking a drawing as the next revision (admin only) |
+| `presentation/itemphotos`, `presentation/revisions` | `ItemPhotosSection`; `RevisionControls`, `useCarryForward`, `CarryForwardBanner` |
+
+- **Report pages are a list.** `FlattenedSheetExporter` takes `reports`:
+  writers appended after the sheets, each handed the schedule's entries and a
+  context — the drawing's name, who issued it, how to load a photo, the
+  project. The schedule and the item pages are two of them; another report is
+  a new writer and one line in `ServiceContainer`. This option, `itemId` on
+  `PunchListEntry`, and the schedule writer's exported `wrap`, `sanitize` and
+  `statusColor` are the extension points SCRUM-88 added.
+- **An item's photos are not markups.** They hang off the item by id, so they
+  stay with it through edits and moves. The server accepts only the project's
+  own uploads; anyone on the project may add one, editors and the person who
+  added it may remove it.
+- **Items belong to a sheet number, not a page.** `planCarryForward` matches
+  numbers loosely ("A-101", "A101", "a 101") and moves each open item as
+  itself — same id, so its history, comments and photos follow — through
+  `EditorService.applyAll`: one undo step, checked and recorded. Closed items
+  stay with the set they were closed on, and issued items with the set they
+  were issued on. The caller passes the project's seals, because the editor's
+  policy only knows the seals of the open sheet, and a revision has none.
+- **The flag is a field.** `LocationCheckField` is an ordinary item field, so
+  the flag survives a reload and is cleared by an ordinary, undoable edit:
+  the `confirm` field editor shows the notice and **Confirm location**.
+- **The library row has a slot.** `DrawingList` takes `rowExtras(drawing,
+  drawings)`, passed through `LibraryButton`; the revision badges and **Upload
+  revision** live there, not in the list.
+
+`npm run verify -- item-photos`, `npm run verify -- revisions`, and `go test`
+(`item_photos_test.go`, `revisions_test.go`).
+
 ## Staying current
 
 With a team on one server, the open sheet is re-read — markups, who last
@@ -928,13 +971,18 @@ web/src/
                                DrawingLibrary, SheetNameRepository,
                                SheetNameDetector, TaskRepository,
                                CommentRepository, BookmarkRepository,
-                               TrashRepository, IssueRepository — all
+                               TrashRepository, IssueRepository,
+                               ItemPhotoRepository, RevisionRepository — all
                                CONTRACTS
     documents/                 sheetNames — how a sheet is named, and read back
     tasks/                     the Tasks tab's rows, sorts, groups and CSV
     comments/                  Comment, threadsOf — a task's conversation
     reversals/                 StatusTransition, DeletedItem, IssueRecord —
                                putting accidents right
+    itemphotos/                ItemPhoto — a photo attached to an item
+    revisions/                 RevisionLink, describeRevisions,
+                               planCarryForward — a drawing's next set, and
+                               moving open items onto it
     sheets/                    SheetName, SheetNames, findSheetName — what a
                                sheet is called, read from its title block;
                                searchSheets — finding one by its number
@@ -954,7 +1002,9 @@ web/src/
   infrastructure/              TIER 3 — implements the contracts
     pdf/                       drawing a page and reading title blocks — the
                                ONLY two files importing pdfjs-dist are here
-    export/                    pdf-lib exporter + 6 annotation writers
+    export/                    pdf-lib exporter + 6 annotation writers, and
+                               the report pages: the schedule and one page
+                               per item
     persistence/               InMemory | LocalStorage | Http, plus the
                                export-history and change-log repositories
     identity/                  CryptoIdGenerator,
@@ -968,6 +1018,8 @@ web/src/
     comments/                  HttpCommentRepository — a task's comments, counts
     bookmarks/                 HttpBookmarkRepository — a person's starred sheets
     reversals/                 HttpTrashRepository, HttpIssueRepository
+    itemphotos/                HttpItemPhotoRepository — an item's photos
+    revisions/                 HttpRevisionRepository — which set replaced which
 
   presentation/                TIER 1 — React
     ServiceContainer.jsx       COMPOSITION ROOT — the only wiring file
@@ -983,6 +1035,9 @@ web/src/
     comments/                  CommentsSection — the thread under a task
     bookmarks/                 the star, the Bookmarks menu and sheet search
     reversals/                 send back, Recently deleted, Issue history
+    itemphotos/                an item's photos, in the side and task panels
+    revisions/                 Rev N badges, Upload revision, carrying items
+                               forward
     punchlist/                 the punch list view and its loader
     library/                   the project's drawings: the list, the top-bar
                                dialog, opening from disk or from the server
@@ -999,7 +1054,7 @@ web/src/
       useAutoFocus.js          focus that survives the gesture that opened it
 
 web/scripts/
-  verify-all.mjs               npm run verify — runs every verify-*.mjs (24
+  verify-all.mjs               npm run verify — runs every verify-*.mjs (26
                                suites); `npm run verify -- photos` runs one
   verify-*.mjs                 one suite per behaviour, no framework
 
@@ -1012,6 +1067,8 @@ backend/
   tasks.go                     the Tasks tab's project-wide reads
   comments.go, bookmarks.go    checking comments, counting them; starred sheets
   reversals.go                 the trash, issue history and voiding an issue
+  item_photos.go               photos attached to an item
+  revisions.go                 which drawing is the next revision of which
   *_schema.sql                 applied at startup (schema.sql is the base)
   *_test.go                    integration tests against punchlist_test
 ```

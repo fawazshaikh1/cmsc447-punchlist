@@ -4,9 +4,9 @@ Running record of what is built, what is verified, and what is not. Update this
 at the end of each work session — it is the thing that makes a sprint review
 easy to write.
 
-**Last updated:** 2026-11-17 — three small fixes (SCRUM-82, 83, 84)
+**Last updated:** 2026-11-24 — photos on items, revisions, carrying items forward (SCRUM-88, 90, 91)
 **Stack:** React 19 + pdf.js + pdf-lib, plain JavaScript, Vite · Go + pgx · PostgreSQL 17 · AWS (S3, RDS) planned
-**Codebase:** 292 source files, ~33,200 lines (app and server)
+**Codebase:** 314 source files, ~34,900 lines (app and server)
 
 ---
 
@@ -66,6 +66,10 @@ easy to write.
 | **Send a task back** | **Done** | Moving a task towards Open (side panel, task panel or bulk bar) asks why, once; recorded as "Send back", the reason posted as a comment on each task that went back. Editors only. `verify -- reversals`, Go role test; browser as admin, power collaborator and collaborator |
 | **Recently deleted** | **Done** | Every markup deleted in the last 30 days, kept by a database trigger; admins restore it with its id, number, fields, comments and history, or are told its drawing has gone. `verify -- reversals`, 3 Go tests; browser |
 | **Void an issue** | **Done** | Issue history lists every issued PDF; an admin voids one with a warning and a reason, which unlocks what only it locked, and it stays in the list marked void. `verify -- reversals` (12 checks), Go tests incl. a later issue still holding; browser |
+| **Photos on an item** | **Done** | **Add photo** under an item's details, in the side panel and the task panel, from the camera or a file. Anyone on the project may add one; editors, and whoever added it, may remove one. They stay with the item when it moves. `go test` (3 tests), `verify -- item-photos`; browser as admin and collaborator |
+| **A page per item in the issued PDF** | **Done** | After the schedule, each item has its own page: number, sheet, status, description, details, and its photos with who added them and when. `verify -- item-photos` (7 checks); a real issue from the app with two photos, read back, then voided |
+| **Upload a revision** | **Done** | An admin uploads the next revision from a drawing's row in **Drawings**; it keeps its own name, or "Set (rev 2).pdf" when that is taken. The list marks **Rev 2** and **Superseded**. `go test` (2 tests), `verify -- revisions`; browser |
+| **Carry open items forward** | **Done** | Opening a revised set offers to move the old set's open items to the sheets with the same numbers, as one undo step, each flagged *Sheet revised* until someone confirms its location. Closed and issued items stay, and anything that cannot move is listed with why. `verify -- revisions` (10 checks); browser |
 
 ---
 
@@ -140,6 +144,45 @@ embedded font (~300KB per export) — a deliberate Sprint 3 decision.
 ---
 
 ## Session log
+
+### 2026-11-24 — photos on items, revisions, carrying items forward (SCRUM-88, 90, 91)
+
+- **Photos on an item (SCRUM-88).** **Add photo** under an item's details, in
+  the side panel and the task panel, attaches a photo to the item itself
+  rather than placing one on the sheet. Anyone on the project may add one —
+  a subcontractor photographing finished work is the usual case — and the
+  server takes only the project's own uploads. Editors, and whoever added a
+  photo, may remove it.
+- **A page per item in the issued PDF (SCRUM-88).** After the schedule, each
+  item gets a page: its number, sheet, status, description and details, then
+  its photos two to a row with who added them and when, running onto a
+  "(continued)" page when there are many. A thumbnail on the schedule row
+  itself is left for later; comments are not printed.
+- **Uploading a revision (SCRUM-90).** An admin uploads the next revision from
+  the current set's row in **Drawings**. It keeps its own file name, or
+  becomes "Set (rev 2).pdf" when the name is taken, and the server records
+  which set it replaces — one revision per set, no loops. The list marks
+  **Rev 2** and **Superseded**.
+- **Carrying open items forward (SCRUM-91).** Opening a revised set offers to
+  move the old set's open items to whichever page has the same sheet number
+  ("A-101", "A101" and "a 101" match). They move as themselves — same id,
+  fields, comments, photos and history — as one undo step, each flagged
+  *Sheet revised — check this item is still in the right place* until someone
+  presses **Confirm location**. Closed items stay with the set they were
+  closed on; an item whose sheet has no number, or whose number is gone,
+  stays and is listed with the reason. Offered to admins and power
+  collaborators, never automatic.
+- **Found in the browser: issued items moved.** The first carry moved five
+  issued items, because the editor's lock check knows only the seals of the
+  open sheet, and the revision has none. Undo put them back; the plan now
+  reads the project's seals, keeps issued items where they are and says why
+  ("void the issue to move them"). `verify -- revisions` checks it.
+
+Verified: 26 suites, `go test -race`, lint, build. In the browser: a revision
+uploaded and labelled; one item carried with its photo, flagged, confirmed and
+still there after a reload, with five issued items kept back; photos added as
+admin and as collaborator, and one removed by an editor; one real issue whose
+item page was read back with both photos, then voided.
 
 ### 2026-11-17 — three small fixes (SCRUM-82, 83, 84)
 
