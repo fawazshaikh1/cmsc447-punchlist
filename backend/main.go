@@ -106,6 +106,14 @@ func routes() http.Handler {
 	mux.HandleFunc("GET /api/projects/{projectID}/trash", handleListTrash)
 	mux.HandleFunc("GET /api/projects/{projectID}/issues", handleListIssues)
 	mux.HandleFunc("POST /api/exports/{exportID}/void", handleVoidIssue)
+	// Photos on a punch item (SCRUM-88).
+	mux.HandleFunc("GET /api/annotations/{annotationID}/photos", handleItemPhotos)
+	mux.HandleFunc("POST /api/annotations/{annotationID}/photos", handleAddItemPhoto)
+	mux.HandleFunc("GET /api/projects/{projectID}/item-photos", handleProjectItemPhotos)
+	mux.HandleFunc("DELETE /api/item-photos/{photoID}", handleRemoveItemPhoto)
+	// A drawing's revisions (SCRUM-90).
+	mux.HandleFunc("GET /api/projects/{projectID}/revisions", handleListRevisions)
+	mux.HandleFunc("PUT /api/projects/{projectID}/documents/{documentID}/revision-of/{previousID}", handleLinkRevision)
 
 	return withCORS(requireAppRequest(mux))
 }
